@@ -1,0 +1,116 @@
+'****************************************************************
+' Desenvolvedor: Júlio Gadioli Soares
+'Cabeçalho Worksheet
+'Suponha que precise verificar se as datas estão preenchidas, na sequência Prevista|Data_Realizada|Data_QA|Data Conclusão
+'ID_Plan|Controle|ETAPA|ID_AVALIAÇÃO|Descricao_Plano|Responsavel|EMAIL|Data_Prevista|Data_Realizada|Data_QA|Data Conclusão
+'Verifica_PlanoAcao
+'0 Não existe Plano de ação
+'1 Existe mas FALTA DATA PREVISTA
+'2 (OK-PREVISTA)FALTA REALIZADA
+'3 (OK-PREVISTA) (OK-REALIZADA) FALTA QA - {ALERTA}
+'4 (OK-PREVISTA) (OK-REALIZADA) (OK-QA) FALTA DATA CONLUSÃO - {ALERTA}
+'5 (OK-PREVISTA) (OK-REALIZADA) (OK-QA) (OK-Conclusão) AVANÇO
+'*********************************************************
+'
+'       FUNCTION VERIFICA DATAS
+'
+Public Function Verifica_PlanoAcao() As Integer
+On Error GoTo Err_Control
+Dim x As Long
+Dim ContaPlanos As Integer
+Dim CountDtPrev As Byte
+Dim CountDtRealizada As Byte
+Dim CountDtQA As Byte
+Dim CountDtConcluido As Byte
+Dim Verifica_PlanoAcao_Existe As Byte
+Dim IDControl As String
+Dim TipoPlan As String
+Dim IDAvaliacao As String
+Dim dbPA As Worksheet
+Dim QntPA As Long
+
+Verifica_PlanoAcao_Existe = 0
+
+IDControl = Frm_SeuForm.txtID.Value
+TipoPlan = Frm_SeuForm.txtEtapa.Value
+IDAvaliacao = Frm_SeuForm.txtIDAvaliacao.Value
+
+''IDControl = "19"
+''TipoPlan = "SO"
+''IDAvaliacao = "1"
+
+Set dbPA = ThisWorkbook.Sheets("PlanosAcao")
+QntPA = (dbPA.Cells(rows.Count, 1).End(xlUp).Row)
+
+For x = 2 To QntPA
+    If (Trim(dbPA.Cells(x, "B").Value) = Trim(IDControl)) And (Trim(dbPA.Cells(x, "C").Value) = Trim(TipoPlan)) And (Trim(dbPA.Cells(x, "D").Value) = Trim(IDAvaliacao)) Then
+        Verifica_PlanoAcao_Existe = 1
+        ContaPlanos = ContaPlanos + 1
+        If (Trim(dbPA.Cells(x, "H").Value) <> "") Then
+            CountDtPrev = CountDtPrev + 1
+            If (Trim(dbPA.Cells(x, "I").Value) <> "") Then
+                CountDtRealizada = CountDtRealizada + 1
+                If (Trim(dbPA.Cells(x, "J").Value) <> "") Then
+                    CountDtQA = CountDtQA + 1
+                    If (Trim(dbPA.Cells(x, "K").Value) <> "") Then
+                        CountDtConcluido = CountDtConcluido + 1
+                    End If
+                End If
+            End If
+        End If
+    End If
+Next x
+
+'Debug.Print "ContaPlanos: "; ContaPlanos
+'Debug.Print "CountDtPrev: "; CountDtPrev
+'Debug.Print "CountDtRealizada: "; CountDtRealizada
+'Debug.Print "CountDtQA: "; CountDtQA
+'Debug.Print "CountDtConcluido: "; CountDtConcluido
+
+If (ContaPlanos = CountDtPrev) And (CountDtPrev = CountDtRealizada) And (CountDtRealizada = CountDtQA) And (CountDtQA = CountDtConcluido) Then
+    Verifica_PlanoAcao = 5  '5 (OK-PREVISTA) (OK-REALIZADA) (OK-QA) (OK-Conclusão) AVANÇO
+ElseIf (ContaPlanos = CountDtPrev) And (CountDtPrev = CountDtRealizada) And (CountDtRealizada = CountDtQA) And (CountDtQA > CountDtConcluido) Then ' FALTA data QA
+    Verifica_PlanoAcao = 4  '4 (OK-PREVISTA) (OK-REALIZADA) (OK-QA) FALTA DATA CONLUSÃO - {ALERTA}
+ElseIf (ContaPlanos = CountDtPrev) And (CountDtPrev = CountDtRealizada) And (CountDtRealizada > CountDtQA) Then ' FALTA data QA
+    Verifica_PlanoAcao = 3  '3 (OK-PREVISTA) (OK-REALIZADA) FALTA QA - {ALERTA}
+ElseIf (ContaPlanos = CountDtPrev) And (CountDtPrev > CountDtRealizada) Then 'tudo feito FALTA data QA
+    Verifica_PlanoAcao = 2  '2 (OK-PREVISTA)FALTA REALIZADA
+ElseIf (ContaPlanos > 1) And (ContaPlanos <> CountDtPrev) Then
+    Verifica_PlanoAcao = 1  '1 Existe mas FALTA DATA PREVISTA
+Else
+    Verifica_PlanoAcao = 0  '0 Não existe Plano de ação
+End If
+If ContaPlanos = 0 Then Verifica_PlanoAcao = 0
+
+'Debug.Print "Verifica_PlanoAcao: "; Verifica_PlanoAcao
+
+ThisWorkbook.Sheets("PlanosAcao").Select
+Err_Control:
+If Err.Number <> 0 Then
+    MsgBox Err.Description
+    Call LogErr("Mod_Verifica_Avancar-Verifica_PlanoAcao", Err.Number, Err.Description)
+End If
+Exit_Function:
+
+x = vbNull
+ContaPlanos = vbNull
+CountDtPrev = vbNull
+CountDtQA = vbNull
+CountDtConcluido = vbNull
+QntPA = vbNull
+Verifica_PlanoAcao_Existe = vbNull
+IDControl = vbNullString
+TipoPlan = vbNullString
+IDAvaliacao = vbNullString
+Set dbPA = Nothing
+
+End Function
+'****************************************************************
+Public Function LogErr(Modulo As String, ErrNumber As Integer, ErrDescription As String)
+On Error Resume Next
+Dim strFile_Path As String
+strFile_Path = Application.ActiveWorkbook.Path & "\" & ActiveWorkbook.Name & "_" & "log_file.txt"
+    Open strFile_Path For Append As #1
+    Write #1, Now() & " | Módulo: " & Modulo & " | Err_Number: " & ErrNumber & " | Err_Description: " & ErrDescription & " | Máquina: " & Environ$("computername") & " | User: " & Application.UserName
+    Close #1
+End Function

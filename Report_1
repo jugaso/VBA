@@ -1,0 +1,1469 @@
+
+Option Explicit
+'Módulo busca da planilha ControlesAvaliacoes os resultados e gera o relatório.
+
+Sub Teste_Local_Relatorio()
+''debug.print "Teste sem if: Start: "; Now()
+    Call Criar_Relatorio_Geral_Consolidado1("Administradores", "1")
+''debug.print "Teste sem if: End  : "; Now()
+End Sub
+
+Sub Criar_Relatorio_Geral_Consolidado1(StrGrupo As String, StrAvaliacao As String)
+Dim report As String
+Dim wrk As String
+report = "Relatório_Consolidado"
+
+If SheetExists(report) = True Then
+    Application.DisplayAlerts = False
+        ThisWorkbook.Sheets(report).Delete
+    Application.DisplayAlerts = True
+Else
+End If
+
+wrk = ThisWorkbook.Name
+
+Dim obj As Object
+Set obj = Workbooks(wrk).Sheets.Add(Before:=ActiveSheet, Count:=1, Type:=XlSheetType.xlWorksheet)
+obj.Name = report
+
+Call Criar_Layout_Report_1(report)
+Call Contabilizar(report, StrGrupo, StrAvaliacao)
+Call Planos_Acao_Report1(report, StrGrupo, StrAvaliacao)
+Call Completa_Planos_Acao_Report1(report)
+Call Terminar_Layout_Report_1(report)
+Application.ScreenUpdating = True
+Call Exportar_Report_1(report)
+
+Set obj = Nothing
+report = vbNullString
+End Sub
+
+Sub Exportar_Report_1(report As String)
+Dim WrkOrigem As String
+Dim WrkDestino As String
+Dim WrsDestino As String
+
+WrkOrigem = ActiveWorkbook.Name
+Workbooks.Add
+WrkDestino = ActiveWorkbook.Name
+WrsDestino = Workbooks(WrkDestino).Sheets(1).Name
+
+Workbooks(WrkOrigem).Worksheets(report).Copy Before:=Workbooks(WrkDestino).Worksheets(WrsDestino)
+
+Application.DisplayAlerts = False
+    Workbooks(WrkDestino).Worksheets(WrsDestino).Delete
+Application.DisplayAlerts = True
+
+End Sub
+
+
+Sub Terminar_Layout_Report_1(report As String)
+Dim wrk As String
+wrk = ThisWorkbook.Name
+Workbooks(wrk).Activate
+
+Call DesProteger_sysconfig
+
+    Workbooks(wrk).Worksheets(report).Select
+    Workbooks(wrk).Worksheets(report).Rows("1:1").Select
+    Selection.Insert Shift:=xlDown, CopyOrigin:=xlFormatFromLeftOrAbove
+    Selection.RowHeight = 36.75
+    
+    Workbooks(wrk).Worksheets("sysconfig").Select
+    Workbooks(wrk).Worksheets("sysconfig").Shapes.range(Array("LogoPrudential1")).Select
+    Selection.Copy
+    Workbooks(wrk).Worksheets(report).Select
+    ActiveSheet.Paste
+    Selection.ShapeRange.IncrementLeft 49.4117322835
+    Selection.ShapeRange.IncrementTop 1.7647244094
+    
+Workbooks(wrk).Worksheets(report).range("B1:P1").HorizontalAlignment = xlCenter
+Workbooks(wrk).Worksheets(report).range("B1:P1").VerticalAlignment = xlCenter
+Workbooks(wrk).Worksheets(report).range("B1:P1").WrapText = False
+Workbooks(wrk).Worksheets(report).range("B1:P1").Orientation = 0
+Workbooks(wrk).Worksheets(report).range("B1:P1").AddIndent = False
+Workbooks(wrk).Worksheets(report).range("B1:P1").IndentLevel = 0
+Workbooks(wrk).Worksheets(report).range("B1:P1").ShrinkToFit = False
+Workbooks(wrk).Worksheets(report).range("B1:P1").ReadingOrder = xlContext
+Workbooks(wrk).Worksheets(report).range("B1:P1").MergeCells = False
+Workbooks(wrk).Worksheets(report).range("B1:P1").Merge
+
+Workbooks(wrk).Worksheets(report).range("B1:P1").Font.Name = "Calibri"
+Workbooks(wrk).Worksheets(report).range("B1:P1").Font.Size = 22
+
+Workbooks(wrk).Worksheets(report).range("B1:P1").Font.Bold = True
+
+Workbooks(wrk).Worksheets(report).range("B1:P1").Value = "Relatório consolidado com planos de ação"
+If Workbooks(wrk).Worksheets(report).range("A16").Value = "Nenhum plano de ação localizado" Then Workbooks(wrk).Worksheets(report).range("B1:P1").Value = "Relatório consolidado"
+Workbooks(wrk).Worksheets(report).range("A1:P1").Borders(xlDiagonalDown).LineStyle = xlNone
+Workbooks(wrk).Worksheets(report).range("A1:P1").Borders(xlDiagonalUp).LineStyle = xlNone
+Workbooks(wrk).Worksheets(report).range("A1:P1").Borders(xlEdgeLeft).LineStyle = xlNone
+Workbooks(wrk).Worksheets(report).range("A1:P1").Borders(xlEdgeTop).LineStyle = xlNone
+Workbooks(wrk).Worksheets(report).range("A1:P1").Borders(xlEdgeBottom).LineStyle = xlDouble
+Workbooks(wrk).Worksheets(report).range("A1:P1").Borders(xlEdgeBottom).ColorIndex = xlAutomatic
+Workbooks(wrk).Worksheets(report).range("A1:P1").Borders(xlEdgeBottom).TintAndShade = 0
+Workbooks(wrk).Worksheets(report).range("A1:P1").Borders(xlEdgeBottom).Weight = xlThick
+
+Workbooks(wrk).Worksheets(report).range("A1:P1").Borders(xlEdgeRight).LineStyle = xlNone
+Workbooks(wrk).Worksheets(report).range("A1:P1").Borders(xlInsideVertical).LineStyle = xlNone
+Workbooks(wrk).Worksheets(report).range("A1:P1").Borders(xlInsideHorizontal).LineStyle = xlNone
+Columns("A:A").EntireColumn.AutoFit
+
+Call Proteger_sysconfig
+
+End Sub
+Sub Completa_Planos_Acao_Report1(report As String)
+On Error GoTo Err_Control
+Dim DBTblControles As Worksheet
+Dim QntTblControles As Long
+Dim LocateControl As String
+Dim DBReport As Worksheet
+Dim QntReport As Long
+Dim DBAvaliacoes As Worksheet
+Dim QntAvaliacoes As Long
+Dim RowStart As String
+Dim x As Long
+Dim y As Long
+Dim z As Long
+
+Set DBAvaliacoes = ThisWorkbook.Worksheets("ControlesAvaliacoes")
+QntAvaliacoes = DBAvaliacoes.Cells(Rows.Count, 1).End(xlUp).Row
+
+Set DBTblControles = ThisWorkbook.Worksheets("TblControles")
+QntTblControles = DBTblControles.Cells(Rows.Count, 1).End(xlUp).Row
+
+Set DBReport = ThisWorkbook.Worksheets(report)
+QntReport = DBReport.Cells(Rows.Count, 1).End(xlUp).Row
+
+For x = 15 To QntReport
+'debug.print DBReport.Cells(x, 1).Value
+    If (DBReport.Cells(x, 1).Value = "ID CONTROLE") Then
+        LocateControl = DBReport.Cells(x, 2).Value
+        For y = 2 To QntTblControles
+            If (DBTblControles.Cells(y, 1).Value = LocateControl) Then
+                DBReport.Cells(x + 2, 2).Value = (DBTblControles.Cells(y, "D").Value)
+                DBReport.Cells(x + 3, 2).Value = (DBTblControles.Cells(y, "F").Value)
+                DBReport.Cells(x + 4, 2).Value = (DBTblControles.Cells(y, "H").Value)
+                DBReport.Cells(x + 5, 2).Value = (DBTblControles.Cells(y, "J").Value)
+                GoTo Continue
+            End If
+        Next y
+Continue:
+        For z = 2 To QntAvaliacoes
+                If (DBAvaliacoes.Cells(z, 1).Value = LocateControl) Then
+                    If (DBReport.Cells(x + 1, 3).Value = "Self Assessment / Desenho") Then
+                        DBReport.Cells(x + 6, 2).Value = (DBAvaliacoes.Cells(z, "D").Value)
+                        DBReport.Cells(x + 7, 2).Value = (DBAvaliacoes.Cells(z, "E").Value)
+                    ElseIf (DBReport.Cells(x + 1, 3).Value = "Self Assessment / Operação") Then
+                        DBReport.Cells(x + 6, 2).Value = (DBAvaliacoes.Cells(z, "J").Value)
+                        DBReport.Cells(x + 7, 2).Value = (DBAvaliacoes.Cells(z, "K").Value)
+                    ElseIf (DBReport.Cells(x + 1, 3).Value = "Walktrough / Desenho") Then
+                        DBReport.Cells(x + 6, 2).Value = (DBAvaliacoes.Cells(z, "P").Value)
+                        DBReport.Cells(x + 7, 2).Value = (DBAvaliacoes.Cells(z, "Q").Value)
+                    ElseIf (DBReport.Cells(x + 1, 3).Value = "Walktrough / Operação") Then
+                        DBReport.Cells(x + 6, 2).Value = (DBAvaliacoes.Cells(z, "V").Value)
+                        DBReport.Cells(x + 7, 2).Value = (DBAvaliacoes.Cells(z, "W").Value)
+                    End If
+                GoTo Continue1
+                End If
+            Next z
+Continue1:
+    End If
+Next x
+
+Err_Control:
+If Err.Number <> 0 Then
+    MsgBox Err.Description
+End If
+
+Set DBTblControles = Nothing
+QntTblControles = vbNull
+LocateControl = vbNullString
+Set DBReport = Nothing
+QntReport = vbNull
+Set DBAvaliacoes = Nothing
+QntAvaliacoes = vbNull
+RowStart = vbNullString
+x = vbNull
+y = vbNull
+z = vbNull
+End Sub
+
+Sub Planos_Acao_Report1(report As String, StrGrupo As String, StrAvaliacao As String)
+On Error GoTo Err_Control
+Dim DBPlanos As Worksheet
+Dim QntPlanos As Long
+Dim RowStart As String
+Dim RStart As String
+Dim RRange As String
+Dim R2Range As String
+Dim R3Range As String
+Dim x As Long
+
+Set DBPlanos = ThisWorkbook.Worksheets("PlanosAcao")
+QntPlanos = DBPlanos.Cells(Rows.Count, 1).End(xlUp).Row
+
+'------ indexando
+Dim IDGrupo As String
+Dim i As Long
+Dim DBGrupos As Worksheet 'DBGrupo
+Dim QntGrupos As Long
+Dim y As Long
+Dim QntPlanosAcoes As Long
+Dim QntGrupo As Long
+
+Set DBGrupos = ThisWorkbook.Worksheets("Grupos")
+QntGrupos = DBGrupos.Cells(Rows.Count, 1).End(xlUp).Row
+For y = 2 To QntGrupos
+    If Trim(DBGrupos.Cells(y, 2).Value) = Trim(StrGrupo) Then
+        IDGrupo = (DBGrupos.Cells(y, 1).Value)
+        GoTo Continue
+    End If
+Next y
+Continue:
+
+Dim DBGruposControles As Worksheet 'DBGrupo
+Dim QntGruposControles As Long
+Dim z As Long
+Dim GruposControles As Variant
+Dim DBPlanosAcoes As Worksheet
+Dim element As Variant
+Dim LinhasLocalizadas As Variant
+Dim StrDescPlan As String
+Dim TamStrDescPlan As String
+Dim localizou As Byte
+RowStart = "15"
+
+i = 0
+Set DBGruposControles = ThisWorkbook.Worksheets("GruposControles")
+QntGruposControles = DBGruposControles.Cells(Rows.Count, 1).End(xlUp).Row
+ReDim GruposControles(QntGruposControles)
+For y = 2 To QntGruposControles
+    If Trim(DBGruposControles.Cells(y, 1).Value) = Trim(IDGrupo) Then
+        GruposControles(i) = Trim(DBGruposControles.Cells(y, 2).Value)
+        i = i + 1
+    End If
+Next y
+QntGrupo = i
+ReDim Preserve GruposControles(i)
+
+Set DBPlanosAcoes = ThisWorkbook.Worksheets("PlanosAcao")
+QntPlanosAcoes = DBPlanosAcoes.Cells(Rows.Count, 1).End(xlUp).Row
+
+
+i = 0
+ReDim LinhasLocalizadas(QntPlanosAcoes)
+For Each element In GruposControles
+    For x = 2 To QntPlanosAcoes
+        If str(DBPlanosAcoes.Cells(x, 2).Value) = str(element) And DBPlanosAcoes.Cells(x, 4).Value = (StrAvaliacao) Then
+        LinhasLocalizadas(i) = x
+        i = i + 1
+    End If
+    Next x
+Next element
+ReDim Preserve LinhasLocalizadas(i)
+
+
+If i = 0 Then
+    Worksheets(report).range("A" & 15).Value = "Nenhum plano de ação localizado"
+    GoTo Err_Control
+End If
+
+For Each element In LinhasLocalizadas
+localizou = 0
+    For x = 2 To QntPlanosAcoes
+    If x = Trim(element) Then
+    localizou = 1
+            RStart = RowStart
+            Worksheets(report).range("A" & RowStart).Value = "ID CONTROLE"
+            Worksheets(report).range("B" & RowStart).Value = Trim(DBPlanos.Cells(x, "B").Value)
+            Worksheets(report).range("B" & RowStart).HorizontalAlignment = xlCenter
+    
+            Worksheets(report).range("C" & RowStart).Value = "PLANOS DE AÇÃO"
+            Worksheets(report).range("C" & RowStart & ":F" & RowStart).Merge
+            Worksheets(report).range("C" & RowStart & ":F" & RowStart).Interior.ThemeColor = xlThemeColorDark1
+            Worksheets(report).range("C" & RowStart & ":F" & RowStart).Interior.Pattern = xlSolid
+            Worksheets(report).range("C" & RowStart & ":F" & RowStart).Interior.PatternColorIndex = xlAutomatic
+            Worksheets(report).range("C" & RowStart & ":F" & RowStart).Interior.TintAndShade = -0.149998474074526
+            Worksheets(report).range("C" & RowStart & ":F" & RowStart).Interior.PatternTintAndShade = 0
+            Worksheets(report).range("C" & RowStart & ":F" & RowStart).VerticalAlignment = xlCenter
+            Worksheets(report).range("C" & RowStart & ":F" & RowStart).HorizontalAlignment = xlCenter
+            Worksheets(report).range("C" & RowStart & ":F" & RowStart).Font.Size = 12
+            Worksheets(report).range("C" & RowStart & ":F" & RowStart).Font.Bold = True
+            
+            If Trim(DBPlanos.Cells(x, "C").Value) = "SD" Then
+                Worksheets(report).range("C" & RowStart + 1).Value = "Self Assessment / Desenho"
+            ElseIf Trim(DBPlanos.Cells(x, "C").Value) = "SO" Then Worksheets(report).range("C" & RowStart + 1).Value = "Self Assessment / Operação"
+            ElseIf Trim(DBPlanos.Cells(x, "C").Value) = "WD" Then Worksheets(report).range("C" & RowStart + 1).Value = "Walktrough / Desenho"
+            ElseIf Trim(DBPlanos.Cells(x, "C").Value) = "WO" Then Worksheets(report).range("C" & RowStart + 1).Value = "Walktrough / Operação"
+            End If
+            
+            Worksheets(report).range("C" & RowStart + 1 & ":F" & RowStart + 1).Merge
+            Worksheets(report).range("C" & RowStart + 1 & ":F" & RowStart + 1).Interior.ThemeColor = xlThemeColorDark1
+            Worksheets(report).range("C" & RowStart + 1 & ":F" & RowStart + 1).Interior.Pattern = xlSolid
+            Worksheets(report).range("C" & RowStart + 1 & ":F" & RowStart + 1).Interior.PatternColorIndex = xlAutomatic
+            Worksheets(report).range("C" & RowStart + 1 & ":F" & RowStart + 1).Interior.TintAndShade = -0.149998474074526
+            Worksheets(report).range("C" & RowStart + 1 & ":F" & RowStart + 1).Interior.PatternTintAndShade = 0
+            Worksheets(report).range("C" & RowStart + 1 & ":F" & RowStart + 1).VerticalAlignment = xlCenter
+            Worksheets(report).range("C" & RowStart + 1 & ":F" & RowStart + 1).HorizontalAlignment = xlCenter
+            Worksheets(report).range("C" & RowStart + 1 & ":F" & RowStart + 1).Font.Size = 12
+            Worksheets(report).range("C" & RowStart + 1 & ":F" & RowStart + 1).Font.Bold = True
+           
+            Worksheets(report).range("G" & RowStart).Value = "Data Prevista"
+            Worksheets(report).range("G" & RowStart).HorizontalAlignment = xlCenter
+            Worksheets(report).range("G" & RowStart + 1).Value = Trim(DBPlanos.Cells(x, "H").Value)
+            Worksheets(report).range("G" & RowStart + 1).HorizontalAlignment = xlCenter
+            
+            Worksheets(report).range("H" & RowStart).Value = "Data Realizada"
+            Worksheets(report).range("H" & RowStart).HorizontalAlignment = xlCenter
+            Worksheets(report).range("H" & RowStart + 1).Value = Trim(DBPlanos.Cells(x, "I").Value)
+            Worksheets(report).range("H" & RowStart + 1).HorizontalAlignment = xlCenter
+            Columns("H:H").EntireColumn.AutoFit
+    
+            Worksheets(report).range("J" & RowStart).Value = "Data QA"
+            Worksheets(report).range("J" & RowStart).HorizontalAlignment = xlCenter
+            Worksheets(report).range("J" & RowStart + 1).Value = Trim(DBPlanos.Cells(x, "J").Value)
+            Worksheets(report).range("J" & RowStart + 1).HorizontalAlignment = xlCenter
+            
+            Worksheets(report).range("K" & RowStart).Value = "Data Conclusão"
+            Worksheets(report).range("K" & RowStart).HorizontalAlignment = xlCenter
+            Worksheets(report).range("K" & RowStart + 1).Value = Trim(DBPlanos.Cells(x, "K").Value)
+            Worksheets(report).range("K" & RowStart + 1).HorizontalAlignment = xlCenter
+            Columns("K:K").EntireColumn.AutoFit
+    
+        RowStart = RowStart + 1
+            Worksheets(report).range("A" & RowStart).Value = "ID AVALIAÇÃO"
+            Worksheets(report).range("B" & RowStart).Value = Trim(DBPlanos.Cells(x, "D").Value)
+            Worksheets(report).range("B" & RowStart).HorizontalAlignment = xlCenter
+        RowStart = RowStart + 1
+            Worksheets(report).range("A" & RowStart).Value = "RCSA"
+        RowStart = RowStart + 1
+            Worksheets(report).range("A" & RowStart).Value = "RISCO"
+        RowStart = RowStart + 1
+            Worksheets(report).range("A" & RowStart).Value = "CONTROLE"
+        RowStart = RowStart + 1
+            Worksheets(report).range("A" & RowStart).Value = "DESCRIÇÃO DO CONTROLE"
+        RowStart = RowStart + 1
+            Worksheets(report).range("A" & RowStart).Value = "Observações (Avaliação)"
+        RowStart = RowStart + 1
+            Worksheets(report).range("A" & RowStart).Value = "GAP (Avaliação)"
+        RowStart = RowStart + 1
+    
+            Worksheets(report).range("A" & RowStart).VerticalAlignment = xlCenter
+            Worksheets(report).range("A" & RowStart).Value = "Descrição Plano"
+            Worksheets(report).range("B" & RowStart & ":P" & RowStart).Merge
+            
+            StrDescPlan = Trim(DBPlanos.Cells(x, "E").Value)
+            TamStrDescPlan = Len(StrDescPlan)
+            
+'Descrição Plano
+Worksheets(report).range("B" & RowStart).Value = Trim(DBPlanos.Cells(x, "E").Value)
+            Worksheets(report).range("B" & RowStart).HorizontalAlignment = xlLeft
+            Worksheets(report).range("B" & RowStart).VerticalAlignment = xlTop
+            Worksheets(report).range("B" & RowStart).WrapText = True
+            Worksheets(report).range("B" & RowStart).Orientation = 0
+            Worksheets(report).range("B" & RowStart).AddIndent = False
+            Worksheets(report).range("B" & RowStart).IndentLevel = 0
+            Worksheets(report).range("B" & RowStart).ShrinkToFit = False
+            Worksheets(report).range("B" & RowStart).ReadingOrder = xlContext
+            Worksheets(report).range("B" & RowStart).MergeCells = True
+            
+            If (TamStrDescPlan <= 179) Then
+                Worksheets(report).range("B" & RowStart).RowHeight = 15
+                ElseIf (TamStrDescPlan >= 180) And (TamStrDescPlan < 356) Then Worksheets(report).range("B" & RowStart).RowHeight = 30
+                ElseIf (TamStrDescPlan > 356) And (TamStrDescPlan < 534) Then Worksheets(report).range("B" & RowStart).RowHeight = 45
+                ElseIf (TamStrDescPlan > 356) And (TamStrDescPlan < 534) Then Worksheets(report).range("B" & RowStart).RowHeight = 60
+                ElseIf (TamStrDescPlan > 534) And (TamStrDescPlan < 712) Then Worksheets(report).range("B" & RowStart).RowHeight = 75
+                ElseIf (TamStrDescPlan > 712) And (TamStrDescPlan < 890) Then Worksheets(report).range("B" & RowStart).RowHeight = 90
+                ElseIf (TamStrDescPlan > 890) And (TamStrDescPlan < 1068) Then Worksheets(report).range("B" & RowStart).RowHeight = 105
+                ElseIf (TamStrDescPlan > 1068) And (TamStrDescPlan < 1246) Then Worksheets(report).range("B" & RowStart).RowHeight = 120
+                ElseIf (TamStrDescPlan > 1246) And (TamStrDescPlan < 1424) Then Worksheets(report).range("B" & RowStart).RowHeight = 135
+                ElseIf (TamStrDescPlan > 1424) And (TamStrDescPlan < 1602) Then Worksheets(report).range("B" & RowStart).RowHeight = 150
+                ElseIf (TamStrDescPlan > 1602) And (TamStrDescPlan < 1780) Then Worksheets(report).range("B" & RowStart).RowHeight = 165
+                ElseIf (TamStrDescPlan > 1780) And (TamStrDescPlan < 1958) Then Worksheets(report).range("B" & RowStart).RowHeight = 180
+                ElseIf (TamStrDescPlan > 1958) And (TamStrDescPlan < 2136) Then Worksheets(report).range("B" & RowStart).RowHeight = 195
+                ElseIf (TamStrDescPlan > 2136) Then Worksheets(report).range("B" & RowStart).RowHeight = 360
+            End If
+
+        RowStart = RowStart + 1
+            Worksheets(report).range("A" & RowStart).Value = "Responsavel"
+            Worksheets(report).range("B" & RowStart).Value = Trim(DBPlanos.Cells(x, "F").Value)
+        RowStart = RowStart + 1
+            Worksheets(report).range("A" & RowStart).Value = "Email"
+            Worksheets(report).range("B" & RowStart).Value = Trim(DBPlanos.Cells(x, "G").Value)
+        RowStart = RowStart + 1
+            Worksheets(report).range("A" & RowStart).Value = "Resposta ao Plano de Ação"
+            Worksheets(report).range("B" & RowStart).Value = Trim(DBPlanos.Cells(x, "L").Value)
+        RowStart = RowStart + 1
+            Worksheets(report).range("A" & RowStart).Value = "Resposta (Status) ao Plano de Ação"
+            Worksheets(report).range("B" & RowStart).Value = Trim(DBPlanos.Cells(x, "M").Value)
+            
+        RRange = "A" & RStart & ":P" & RowStart & ""
+            Worksheets(report).range(RRange).Borders(xlDiagonalDown).LineStyle = xlNone
+            Worksheets(report).range(RRange).Borders(xlDiagonalUp).LineStyle = xlNone
+            Worksheets(report).range(RRange).Borders(xlEdgeLeft).LineStyle = xlContinuous
+            Worksheets(report).range(RRange).Borders(xlEdgeLeft).ColorIndex = xlAutomatic
+            Worksheets(report).range(RRange).Borders(xlEdgeLeft).TintAndShade = 0
+            Worksheets(report).range(RRange).Borders(xlEdgeLeft).Weight = xlThin
+            Worksheets(report).range(RRange).Borders(xlEdgeTop).LineStyle = xlContinuous
+            Worksheets(report).range(RRange).Borders(xlEdgeTop).ColorIndex = xlAutomatic
+            Worksheets(report).range(RRange).Borders(xlEdgeTop).TintAndShade = 0
+            Worksheets(report).range(RRange).Borders(xlEdgeTop).Weight = xlThin
+            Worksheets(report).range(RRange).Borders(xlEdgeBottom).LineStyle = xlContinuous
+            Worksheets(report).range(RRange).Borders(xlEdgeBottom).ColorIndex = xlAutomatic
+            Worksheets(report).range(RRange).Borders(xlEdgeBottom).TintAndShade = 0
+            Worksheets(report).range(RRange).Borders(xlEdgeBottom).Weight = xlThin
+            Worksheets(report).range(RRange).Borders(xlEdgeRight).LineStyle = xlContinuous
+            Worksheets(report).range(RRange).Borders(xlEdgeRight).ColorIndex = xlAutomatic
+            Worksheets(report).range(RRange).Borders(xlEdgeRight).TintAndShade = 0
+            Worksheets(report).range(RRange).Borders(xlEdgeRight).Weight = xlThin
+            Worksheets(report).range(RRange).Borders(xlInsideVertical).LineStyle = xlNone
+            
+            Worksheets(report).range(RRange).Borders(xlInsideHorizontal).LineStyle = xlContinuous
+            Worksheets(report).range(RRange).Borders(xlInsideHorizontal).ColorIndex = xlAutomatic
+            Worksheets(report).range(RRange).Borders(xlInsideHorizontal).TintAndShade = 0
+            Worksheets(report).range(RRange).Borders(xlInsideHorizontal).Weight = xlHairline
+    
+        R2Range = "C" & RStart & ":P" & RStart + 1 & ""
+            Worksheets(report).range(R2Range).Borders(xlDiagonalDown).LineStyle = xlNone
+            Worksheets(report).range(R2Range).Borders(xlDiagonalUp).LineStyle = xlNone
+            Worksheets(report).range(R2Range).Borders(xlEdgeLeft).LineStyle = xlContinuous
+            Worksheets(report).range(R2Range).Borders(xlEdgeLeft).ColorIndex = xlAutomatic
+            Worksheets(report).range(R2Range).Borders(xlEdgeLeft).TintAndShade = 0
+            Worksheets(report).range(R2Range).Borders(xlEdgeLeft).Weight = xlHairline
+            Worksheets(report).range(R2Range).Borders(xlEdgeTop).LineStyle = xlContinuous
+            Worksheets(report).range(R2Range).Borders(xlEdgeTop).ColorIndex = xlAutomatic
+            Worksheets(report).range(R2Range).Borders(xlEdgeTop).TintAndShade = 0
+            Worksheets(report).range(R2Range).Borders(xlEdgeTop).Weight = xlThin
+            Worksheets(report).range(R2Range).Borders(xlEdgeBottom).LineStyle = xlNone
+            Worksheets(report).range(R2Range).Borders(xlEdgeRight).LineStyle = xlContinuous
+            Worksheets(report).range(R2Range).Borders(xlEdgeRight).ColorIndex = xlAutomatic
+            Worksheets(report).range(R2Range).Borders(xlEdgeRight).TintAndShade = 0
+            Worksheets(report).range(R2Range).Borders(xlEdgeRight).Weight = xlThin
+            Worksheets(report).range(R2Range).Borders(xlInsideVertical).LineStyle = xlNone
+            Worksheets(report).range(R2Range).Borders(xlInsideHorizontal).LineStyle = xlNone
+            
+        'Ajuste Barra inferior da etapa 1º B17 = "Self Assessment / Desenho"
+        R3Range = "C" & RStart & ":F" & RStart + 1 & ""
+            Worksheets(report).range(R3Range).Borders(xlDiagonalUp).LineStyle = xlNone
+            Worksheets(report).range(R3Range).Borders(xlEdgeLeft).LineStyle = xlContinuous
+            Worksheets(report).range(R3Range).Borders(xlEdgeLeft).ColorIndex = xlAutomatic
+            Worksheets(report).range(R3Range).Borders(xlEdgeLeft).TintAndShade = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeLeft).Weight = xlHairline
+            Worksheets(report).range(R3Range).Borders(xlEdgeTop).LineStyle = xlContinuous
+            Worksheets(report).range(R3Range).Borders(xlEdgeBottom).LineStyle = xlContinuous
+            Worksheets(report).range(R3Range).Borders(xlEdgeBottom).ColorIndex = xlAutomatic
+            Worksheets(report).range(R3Range).Borders(xlEdgeBottom).TintAndShade = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeBottom).Weight = xlHairline
+            Worksheets(report).range(R3Range).Borders(xlEdgeRight).LineStyle = xlContinuous
+            Worksheets(report).range(R3Range).Borders(xlEdgeRight).ColorIndex = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeRight).TintAndShade = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeRight).Weight = xlThin
+            Worksheets(report).range(R3Range).Borders(xlInsideVertical).LineStyle = xlNone
+            Worksheets(report).range(R3Range).Borders(xlInsideHorizontal).LineStyle = xlNone
+            
+        ' Ajuste Datas Prevista e Realizada
+        R3Range = "G" & RStart & ":H" & RStart + 1 & ""
+            Worksheets(report).range(R3Range).Borders(xlDiagonalDown).LineStyle = xlNone
+            Worksheets(report).range(R3Range).Borders(xlDiagonalUp).LineStyle = xlNone
+            Worksheets(report).range(R3Range).Borders(xlEdgeLeft).LineStyle = xlContinuous
+            Worksheets(report).range(R3Range).Borders(xlEdgeLeft).ColorIndex = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeLeft).TintAndShade = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeLeft).Weight = xlThin
+            Worksheets(report).range(R3Range).Borders(xlEdgeTop).LineStyle = xlContinuous
+            Worksheets(report).range(R3Range).Borders(xlEdgeTop).ColorIndex = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeTop).TintAndShade = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeTop).Weight = xlThin
+            Worksheets(report).range(R3Range).Borders(xlEdgeBottom).LineStyle = xlContinuous
+            Worksheets(report).range(R3Range).Borders(xlEdgeBottom).ColorIndex = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeBottom).TintAndShade = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeBottom).Weight = xlThin
+            Worksheets(report).range(R3Range).Borders(xlEdgeRight).LineStyle = xlContinuous
+            Worksheets(report).range(R3Range).Borders(xlEdgeRight).ColorIndex = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeRight).TintAndShade = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeRight).Weight = xlThin
+            Worksheets(report).range(R3Range).Borders(xlInsideVertical).LineStyle = xlContinuous
+            Worksheets(report).range(R3Range).Borders(xlInsideVertical).ColorIndex = 0
+            Worksheets(report).range(R3Range).Borders(xlInsideVertical).TintAndShade = 0
+            Worksheets(report).range(R3Range).Borders(xlInsideVertical).Weight = xlThin
+            Worksheets(report).range(R3Range).Borders(xlInsideHorizontal).LineStyle = xlContinuous
+            Worksheets(report).range(R3Range).Borders(xlInsideHorizontal).ColorIndex = 0
+            Worksheets(report).range(R3Range).Borders(xlInsideHorizontal).TintAndShade = 0
+            Worksheets(report).range(R3Range).Borders(xlInsideHorizontal).Weight = xlHairline
+            
+        ' Ajuste Datas QA e Conclusão
+        R3Range = "J" & RStart & ":K" & RStart + 1 & ""
+            Worksheets(report).range(R3Range).Borders(xlDiagonalDown).LineStyle = xlNone
+            Worksheets(report).range(R3Range).Borders(xlDiagonalUp).LineStyle = xlNone
+            Worksheets(report).range(R3Range).Borders(xlEdgeLeft).LineStyle = xlContinuous
+            Worksheets(report).range(R3Range).Borders(xlEdgeLeft).ColorIndex = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeLeft).TintAndShade = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeLeft).Weight = xlThin
+            Worksheets(report).range(R3Range).Borders(xlEdgeTop).LineStyle = xlContinuous
+            Worksheets(report).range(R3Range).Borders(xlEdgeTop).ColorIndex = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeTop).TintAndShade = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeTop).Weight = xlThin
+            Worksheets(report).range(R3Range).Borders(xlEdgeBottom).LineStyle = xlContinuous
+            Worksheets(report).range(R3Range).Borders(xlEdgeBottom).ColorIndex = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeBottom).TintAndShade = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeBottom).Weight = xlThin
+            Worksheets(report).range(R3Range).Borders(xlEdgeRight).LineStyle = xlContinuous
+            Worksheets(report).range(R3Range).Borders(xlEdgeRight).ColorIndex = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeRight).TintAndShade = 0
+            Worksheets(report).range(R3Range).Borders(xlEdgeRight).Weight = xlThin
+            Worksheets(report).range(R3Range).Borders(xlInsideVertical).LineStyle = xlContinuous
+            Worksheets(report).range(R3Range).Borders(xlInsideVertical).ColorIndex = 0
+            Worksheets(report).range(R3Range).Borders(xlInsideVertical).TintAndShade = 0
+            Worksheets(report).range(R3Range).Borders(xlInsideVertical).Weight = xlThin
+            Worksheets(report).range(R3Range).Borders(xlInsideHorizontal).LineStyle = xlContinuous
+            Worksheets(report).range(R3Range).Borders(xlInsideHorizontal).ColorIndex = 0
+            Worksheets(report).range(R3Range).Borders(xlInsideHorizontal).TintAndShade = 0
+            Worksheets(report).range(R3Range).Borders(xlInsideHorizontal).Weight = xlHairline
+        RowStart = RowStart + 2
+End If
+If localizou = 1 Then GoTo PROXELEMENT
+Next x
+PROXELEMENT:
+Next element
+
+Err_Control:
+If Err.Number <> 0 Then
+    MsgBox Err.Description
+End If
+End Sub
+
+
+
+Sub Contabilizar(report As String, StrGrupo As String, StrAvaliacao As String)
+On Error GoTo Err_Control
+'Status0 = "GAP em Análise."
+'Status1 = "Plano de Ação Sem Data Prevista."
+'Status2 = "Plano de Ação Sem Data Realizada."
+'Status3 = "Plano de Ação Aguardando Análise QA."
+'Status4 = "Plano de Ação Aguardando Conclusão."
+''Status5 = "Concluído"
+'Status6 = "Falta Evidência para avançar."
+'Status7 = "Falta Roteiro de Teste."
+Dim Count_SDE As Long
+Dim Count_SDNE As Long
+Dim Count_SDNA As Long
+Dim Count_SOE As Long
+Dim Count_SONE As Long
+Dim Count_SONA As Long
+Dim Count_WDE As Long
+Dim Count_WDNE As Long
+Dim Count_WDNA As Long
+Dim Count_WOE As Long
+Dim Count_WONE As Long
+Dim Count_WONA As Long
+
+Dim Count_SDESalvo As Long
+Dim Count_SOESalvo As Long
+Dim Count_WDESalvo As Long
+Dim Count_WOESalvo As Long
+
+Dim Count_SDNESalvo As Long
+Dim Count_SONESalvo As Long
+Dim Count_WDNESalvo As Long
+Dim Count_WONESalvo As Long
+
+Dim Count_SDNASalvo As Long
+Dim Count_SONASalvo As Long
+Dim Count_WDNASalvo As Long
+Dim Count_WONASalvo As Long
+
+Dim Count_SDEAvancado As Long
+Dim Count_SOEAvancado As Long
+Dim Count_WDEAvancado As Long
+Dim Count_WOEAvancado As Long
+
+Dim Count_SDNEAvancado As Long
+Dim Count_SONEAvancado As Long
+Dim Count_WDNEAvancado As Long
+Dim Count_WONEAvancado As Long
+
+Dim Count_SDNAAvancado As Long
+Dim Count_SONAAvancado As Long
+Dim Count_WDNAAvancado As Long
+Dim Count_WONAAvancado As Long
+
+Dim Count_SDNE_Status0 As Long
+Dim Count_SDNE_Status1 As Long
+Dim Count_SDNE_Status2 As Long
+Dim Count_SDNE_Status3 As Long
+Dim Count_SDNE_Status4 As Long
+'Count_SDNE_Status5 = "Concluído"
+Dim Count_SDNE_Status6 As Long
+Dim Count_SDNE_Status7 As Long
+
+Dim Count_SONE_Status0 As Long
+Dim Count_SONE_Status1 As Long
+Dim Count_SONE_Status2 As Long
+Dim Count_SONE_Status3 As Long
+Dim Count_SONE_Status4 As Long
+'Count_SONE_Status5 = "Concluído"
+Dim Count_SONE_Status6 As Long
+Dim Count_SONE_Status7 As Long
+
+Dim Count_WDNE_Status0 As Long
+Dim Count_WDNE_Status1 As Long
+Dim Count_WDNE_Status2 As Long
+Dim Count_WDNE_Status3 As Long
+Dim Count_WDNE_Status4 As Long
+'Count_WDNE_Status5 = "Concluído"
+Dim Count_WDNE_Status6 As Long
+Dim Count_WDNE_Status7 As Long
+
+Dim Count_WONE_Status0 As Long
+Dim Count_WONE_Status1 As Long
+Dim Count_WONE_Status2 As Long
+Dim Count_WONE_Status3 As Long
+Dim Count_WONE_Status4 As Long
+'Count_WONE_Status5 = "Concluído"
+Dim Count_WONE_Status6 As Long
+Dim Count_WONE_Status7 As Long
+
+Dim IDGrupo As String
+Dim i As Long
+Dim DBGrupos As Worksheet 'DBGrupo
+Dim QntGrupos As Long
+Dim y As Long
+Dim QntContAv As Long
+Dim QntGrupo As Long
+
+Set DBGrupos = ThisWorkbook.Worksheets("Grupos")
+QntGrupos = DBGrupos.Cells(Rows.Count, 1).End(xlUp).Row
+For y = 2 To QntGrupos
+    If Trim(DBGrupos.Cells(y, 2).Value) = Trim(StrGrupo) Then
+        IDGrupo = (DBGrupos.Cells(y, 1).Value)
+        GoTo Continue
+    End If
+Next y
+Continue:
+
+Dim DBGruposControles As Worksheet 'DBGrupo
+Dim QntGruposControles As Long
+Dim z As Long
+Dim GruposControles As Variant
+
+i = 0
+Set DBGruposControles = ThisWorkbook.Worksheets("GruposControles")
+QntGruposControles = DBGruposControles.Cells(Rows.Count, 1).End(xlUp).Row
+ReDim GruposControles(QntGruposControles)
+For y = 2 To QntGruposControles
+    If Trim(DBGruposControles.Cells(y, 1).Value) = Trim(IDGrupo) Then
+        GruposControles(i) = Trim(DBGruposControles.Cells(y, 2).Value)
+        ''debug.print GruposControles(i)
+        i = i + 1
+    End If
+Next y
+QntGrupo = i
+ReDim Preserve GruposControles(i)
+Dim DBContAv As Worksheet
+Set DBContAv = ThisWorkbook.Worksheets("ControlesAvaliacoes")
+QntContAv = DBContAv.Cells(Rows.Count, 1).End(xlUp).Row
+
+Dim x As Long
+Dim element As Variant
+Dim LinhasLocalizadas As Variant
+
+i = 0
+ReDim LinhasLocalizadas(QntContAv)
+For Each element In GruposControles
+    For x = 2 To QntContAv
+    'If Trim(DBContAv.Cells(x, 1).Value) = 10 Then Stop
+    If str(DBContAv.Cells(x, 1).Value) = str(element) And DBContAv.Cells(x, 2).Value = (StrAvaliacao) Then
+        LinhasLocalizadas(i) = x
+        i = i + 1
+    End If
+    Next x
+Next element
+ReDim Preserve LinhasLocalizadas(i)
+
+For Each element In LinhasLocalizadas
+''debug.print "ElementoGrupo: "; element
+For x = 2 To QntContAv
+''debug.print "ElementoGrupo: "; element; " Avaliação: "; Trim(DBContAv.Cells(x, "A").Value)
+ If x = Trim(element) Then
+'SD -----------------------------------------------------------------------------------------------------------------------------------------------
+    If Trim(DBContAv.Cells(x, "C").Value) = "Eficaz" Then
+        Count_SDE = Count_SDE + 1
+        If IsDate(DBContAv.Cells(x, "G").Value) = True Then Count_SDESalvo = Count_SDESalvo + 1
+        If IsDate(DBContAv.Cells(x, "H").Value) = True Then Count_SDEAvancado = Count_SDEAvancado + 1
+    End If
+    If Trim(DBContAv.Cells(x, "C").Value) = "Não Eficaz" Then
+        Count_SDNE = Count_SDNE + 1
+        'DBContAv.Cells(x, "G").Select
+        If IsDate(DBContAv.Cells(x, "G").Value) = True Then Count_SDNESalvo = Count_SDNESalvo + 1
+        If IsDate(DBContAv.Cells(x, "H").Value) = True Then Count_SDNEAvancado = Count_SDNEAvancado + 1
+        If Trim(DBContAv.Cells(x, "H").Value) = "GAP em Análise." Then Count_SDNE_Status0 = Count_SDNE_Status0 + 1
+        If Trim(DBContAv.Cells(x, "H").Value) = "Plano de Ação Sem Data Prevista." Then Count_SDNE_Status1 = Count_SDNE_Status1 + 1
+        If Trim(DBContAv.Cells(x, "H").Value) = "Plano de Ação Sem Data Realizada." Then Count_SDNE_Status2 = Count_SDNE_Status2 + 1
+        If Trim(DBContAv.Cells(x, "H").Value) = "Plano de Ação Aguardando Análise QA." Then Count_SDNE_Status3 = Count_SDNE_Status3 + 1
+        If Trim(DBContAv.Cells(x, "H").Value) = "Plano de Ação Aguardando Conclusão." Then Count_SDNE_Status4 = Count_SDNE_Status4 + 1
+        If Trim(DBContAv.Cells(x, "H").Value) = "Falta Evidência para avançar." Then Count_SDNE_Status6 = Count_SDNE_Status6 + 1
+        If Trim(DBContAv.Cells(x, "H").Value) = "Falta Roteiro de Teste." Then Count_SDNE_Status7 = Count_SDNE_Status7 + 1
+    End If
+    If Trim(DBContAv.Cells(x, "C").Value) = "Não Aplicável" Then
+        Count_SDNA = Count_SDNA + 1
+        If IsDate(DBContAv.Cells(x, "G").Value) = True Then Count_SDNASalvo = Count_SDNASalvo + 1
+        If IsDate(DBContAv.Cells(x, "H").Value) = True Then Count_SDNAAvancado = Count_SDNAAvancado + 1
+    End If
+'SO -----------------------------------------------------------------------------------------------------------------------------------------------
+    If Trim(DBContAv.Cells(x, "I").Value) = "Eficaz" Then
+        Count_SOE = Count_SOE + 1
+        If IsDate(DBContAv.Cells(x, "M").Value) = True Then Count_SOESalvo = Count_SOESalvo + 1
+        If IsDate(DBContAv.Cells(x, "N").Value) = True Then Count_SOEAvancado = Count_SOEAvancado + 1
+    End If
+    If Trim(DBContAv.Cells(x, "I").Value) = "Não Eficaz" Then
+        Count_SONE = Count_SONE + 1
+        If IsDate(DBContAv.Cells(x, "M").Value) = True Then Count_SONESalvo = Count_SONESalvo + 1
+        If IsDate(DBContAv.Cells(x, "N").Value) = True Then Count_SONEAvancado = Count_SONEAvancado + 1
+        If Trim(DBContAv.Cells(x, "N").Value) = "GAP em Análise." Then Count_SONE_Status0 = Count_SONE_Status0 + 1
+        If Trim(DBContAv.Cells(x, "N").Value) = "Plano de Ação Sem Data Prevista." Then Count_SONE_Status1 = Count_SONE_Status1 + 1
+        If Trim(DBContAv.Cells(x, "N").Value) = "Plano de Ação Sem Data Realizada." Then Count_SONE_Status2 = Count_SONE_Status2 + 1
+        If Trim(DBContAv.Cells(x, "N").Value) = "Plano de Ação Aguardando Análise QA." Then Count_SONE_Status3 = Count_SONE_Status3 + 1
+        If Trim(DBContAv.Cells(x, "N").Value) = "Plano de Ação Aguardando Conclusão." Then Count_SONE_Status4 = Count_SONE_Status4 + 1
+        If Trim(DBContAv.Cells(x, "N").Value) = "Falta Evidência para avançar." Then Count_SONE_Status6 = Count_SONE_Status6 + 1
+        If Trim(DBContAv.Cells(x, "N").Value) = "Falta Roteiro de Teste." Then Count_SONE_Status7 = Count_SONE_Status7 + 1
+    End If
+    If Trim(DBContAv.Cells(x, "I").Value) = "Não Aplicável" Then
+        Count_SONA = Count_SONA + 1
+        If IsDate(DBContAv.Cells(x, "M").Value) = True Then Count_SONASalvo = Count_SONASalvo + 1
+        If IsDate(DBContAv.Cells(x, "N").Value) = True Then Count_SONAAvancado = Count_SONAAvancado + 1
+    End If
+'WD -----------------------------------------------------------------------------------------------------------------------------------------------
+    If Trim(DBContAv.Cells(x, "O").Value) = "Eficaz" Then
+        Count_WDE = Count_WDE + 1
+        If IsDate(DBContAv.Cells(x, "S").Value) = True Then Count_WDESalvo = Count_WDESalvo + 1
+        If IsDate(DBContAv.Cells(x, "T").Value) = True Then Count_WDEAvancado = Count_WDEAvancado + 1
+    End If
+    If Trim(DBContAv.Cells(x, "O").Value) = "Não Eficaz" Then
+        Count_WDNE = Count_WDNE + 1
+        If IsDate(DBContAv.Cells(x, "S").Value) = True Then Count_WDNESalvo = Count_WDNESalvo + 1
+        If IsDate(DBContAv.Cells(x, "T").Value) = True Then Count_WDNEAvancado = Count_WDNEAvancado + 1
+        If Trim(DBContAv.Cells(x, "T").Value) = "GAP em Análise." Then Count_WDNE_Status0 = Count_WDNE_Status0 + 1
+        If Trim(DBContAv.Cells(x, "T").Value) = "Plano de Ação Sem Data Prevista." Then Count_WDNE_Status1 = Count_WDNE_Status1 + 1
+        If Trim(DBContAv.Cells(x, "T").Value) = "Plano de Ação Sem Data Realizada." Then Count_WDNE_Status2 = Count_WDNE_Status2 + 1
+        If Trim(DBContAv.Cells(x, "T").Value) = "Plano de Ação Aguardando Análise QA." Then Count_WDNE_Status3 = Count_WDNE_Status3 + 1
+        If Trim(DBContAv.Cells(x, "T").Value) = "Plano de Ação Aguardando Conclusão." Then Count_WDNE_Status4 = Count_WDNE_Status4 + 1
+        If Trim(DBContAv.Cells(x, "T").Value) = "Falta Evidência para avançar." Then Count_WDNE_Status6 = Count_WDNE_Status6 + 1
+        If Trim(DBContAv.Cells(x, "T").Value) = "Falta Roteiro de Teste." Then Count_WDNE_Status7 = Count_WDNE_Status7 + 1
+    End If
+    If Trim(DBContAv.Cells(x, "O").Value) = "Não Aplicável" Then
+        Count_WDNA = Count_WDNA + 1
+        If IsDate(DBContAv.Cells(x, "S").Value) = True Then Count_WDNASalvo = Count_WDNASalvo + 1
+        If IsDate(DBContAv.Cells(x, "T").Value) = True Then Count_WDNAAvancado = Count_WDNAAvancado + 1
+    End If
+'WO -----------------------------------------------------------------------------------------------------------------------------------------------
+    If Trim(DBContAv.Cells(x, "U").Value) = "Eficaz" Then
+        Count_WOE = Count_WOE + 1
+        If IsDate(DBContAv.Cells(x, "Y").Value) = True Then Count_WOESalvo = Count_WOESalvo + 1
+        If IsDate(DBContAv.Cells(x, "Z").Value) = True Then Count_WOEAvancado = Count_WOEAvancado + 1
+    End If
+    If Trim(DBContAv.Cells(x, "U").Value) = "Não Eficaz" Then
+        Count_WONE = Count_WONE + 1
+        If IsDate(DBContAv.Cells(x, "Y").Value) = True Then Count_WONESalvo = Count_WONESalvo + 1
+        If IsDate(DBContAv.Cells(x, "Z").Value) = True Then Count_WONEAvancado = Count_WONEAvancado + 1
+        If Trim(DBContAv.Cells(x, "Z").Value) = "GAP em Análise." Then Count_WONE_Status0 = Count_WONE_Status0 + 1
+        If Trim(DBContAv.Cells(x, "Z").Value) = "Plano de Ação Sem Data Prevista." Then Count_WONE_Status1 = Count_WONE_Status1 + 1
+        If Trim(DBContAv.Cells(x, "Z").Value) = "Plano de Ação Sem Data Realizada." Then Count_WONE_Status2 = Count_WONE_Status2 + 1
+        If Trim(DBContAv.Cells(x, "Z").Value) = "Plano de Ação Aguardando Análise QA." Then Count_WONE_Status3 = Count_WONE_Status3 + 1
+        If Trim(DBContAv.Cells(x, "Z").Value) = "Plano de Ação Aguardando Conclusão." Then Count_WONE_Status4 = Count_WONE_Status4 + 1
+        If Trim(DBContAv.Cells(x, "Z").Value) = "Falta Evidência para avançar." Then Count_WONE_Status6 = Count_WONE_Status6 + 1
+        If Trim(DBContAv.Cells(x, "Z").Value) = "Falta Roteiro de Teste." Then Count_WONE_Status7 = Count_WONE_Status7 + 1
+    End If
+    If Trim(DBContAv.Cells(x, "U").Value) = "Não Aplicável" Then
+        Count_WONA = Count_WONA + 1
+        If IsDate(DBContAv.Cells(x, "Y").Value) = True Then Count_WONASalvo = Count_WONASalvo + 1
+        If IsDate(DBContAv.Cells(x, "Z").Value) = True Then Count_WONAAvancado = Count_WONAAvancado + 1
+    End If
+    'GoTo Proximo
+Else
+End If
+If (Count_SDESalvo + Count_SDNESalvo + Count_SDNASalvo) = QntContAv - 1 Then GoTo SAI
+Next x
+Proximo:
+Next element
+SAI:
+
+
+Worksheets(report).range("A1").Value = "Controles do Grupo: " & StrGrupo
+Worksheets(report).range("A1").Font.Bold = True
+
+Worksheets(report).range("A2").Value = "Avaliação ID: " & StrAvaliacao
+Worksheets(report).range("A2").Font.Bold = True
+
+Worksheets(report).range("A3").Value = "Total: " & (Count_SDESalvo + Count_SDNESalvo + Count_SDNASalvo) & " de " & QntGrupo
+Worksheets(report).range("A3").Font.Bold = True
+'------------------------------------------------------------------------------------------
+Worksheets(report).range("B4").Value = Count_SDEAvancado
+Worksheets(report).range("C4").Value = Count_SDNEAvancado
+Worksheets(report).range("D4").Value = Count_SDNAAvancado
+
+Worksheets(report).range("B5").Value = (Count_SDESalvo - Count_SDEAvancado)
+Worksheets(report).range("C5").Value = (Count_SDNESalvo - Count_SDNEAvancado)
+Worksheets(report).range("D5").Value = (Count_SDNASalvo - Count_SDNAAvancado)
+
+Worksheets(report).range("C7").Value = Count_SDNE_Status0
+Worksheets(report).range("C8").Value = Count_SDNE_Status1
+Worksheets(report).range("C9").Value = Count_SDNE_Status2
+Worksheets(report).range("C10").Value = Count_SDNE_Status3
+Worksheets(report).range("C11").Value = Count_SDNE_Status4
+Worksheets(report).range("C12").Value = Count_SDNE_Status6
+Worksheets(report).range("C13").Value = Count_SDNE_Status7
+
+'------------------------------------------------------------------------------------------
+Worksheets(report).range("F4").Value = Count_SOEAvancado
+Worksheets(report).range("G4").Value = Count_SONEAvancado
+Worksheets(report).range("H4").Value = Count_SONAAvancado
+
+Worksheets(report).range("F5").Value = (Count_SOESalvo - Count_SOEAvancado)
+Worksheets(report).range("G5").Value = (Count_SONESalvo - Count_SONEAvancado)
+Worksheets(report).range("H5").Value = (Count_SONASalvo - Count_SONAAvancado)
+
+Worksheets(report).range("G7").Value = Count_SONE_Status0
+Worksheets(report).range("G8").Value = Count_SONE_Status1
+Worksheets(report).range("G9").Value = Count_SONE_Status2
+Worksheets(report).range("G10").Value = Count_SONE_Status3
+Worksheets(report).range("G11").Value = Count_SONE_Status4
+Worksheets(report).range("G12").Value = Count_SONE_Status6
+Worksheets(report).range("G13").Value = Count_SONE_Status7
+
+'------------------------------------------------------------------------------------------
+Worksheets(report).range("J4").Value = Count_WDEAvancado
+Worksheets(report).range("K4").Value = Count_WDNEAvancado
+Worksheets(report).range("L4").Value = Count_WDNAAvancado
+
+Worksheets(report).range("J5").Value = (Count_WDESalvo - Count_WDEAvancado)
+Worksheets(report).range("K5").Value = (Count_WDNESalvo - Count_WDNEAvancado)
+Worksheets(report).range("L5").Value = (Count_WDNASalvo - Count_WDNAAvancado)
+
+Worksheets(report).range("K7").Value = Count_WDNE_Status0
+Worksheets(report).range("K8").Value = Count_WDNE_Status1
+Worksheets(report).range("K9").Value = Count_WDNE_Status2
+Worksheets(report).range("K10").Value = Count_WDNE_Status3
+Worksheets(report).range("K11").Value = Count_WDNE_Status4
+Worksheets(report).range("K12").Value = Count_WDNE_Status6
+Worksheets(report).range("K13").Value = Count_WDNE_Status7
+
+'------------------------------------------------------------------------------------------
+Worksheets(report).range("N4").Value = Count_WOEAvancado
+Worksheets(report).range("O4").Value = Count_WONEAvancado
+Worksheets(report).range("P4").Value = Count_WONAAvancado
+
+Worksheets(report).range("N5").Value = (Count_WOESalvo - Count_WOEAvancado)
+Worksheets(report).range("O5").Value = (Count_WONESalvo - Count_WONEAvancado)
+Worksheets(report).range("P5").Value = (Count_WONASalvo - Count_WONAAvancado)
+
+Worksheets(report).range("O7").Value = Count_WONE_Status0
+Worksheets(report).range("O8").Value = Count_WONE_Status1
+Worksheets(report).range("O9").Value = Count_WONE_Status2
+Worksheets(report).range("O10").Value = Count_WONE_Status3
+Worksheets(report).range("O11").Value = Count_WONE_Status4
+Worksheets(report).range("O12").Value = Count_WONE_Status6
+Worksheets(report).range("O13").Value = Count_WONE_Status7
+
+Err_Control:
+If Err.Number <> 0 Then
+    MsgBox Err.Description
+End If
+End Sub
+
+
+
+Sub TESTE_cRIARLAYOUT()
+Dim report As String
+report = "Relatório_Consolidado"
+
+
+Call Criar_Layout_Report_1(report)
+End Sub
+
+Sub Criar_Layout_Report_1(report As String)
+On Error GoTo Err_Control
+'
+' Cria Layout
+'
+Dim SDrng As String
+Dim SOrng As String
+Dim WDrng As String
+Dim WOrng As String
+
+Dim allSDrng As String
+Dim nadaSDrng As String
+Dim rangeNESDrng As String
+
+Dim allSOrng As String
+Dim nadaSOrng As String
+Dim rangeNESOrng As String
+
+Dim allWDrng As String
+Dim nadaWDrng As String
+Dim rangeNEWDrng As String
+
+Dim allWOrng As String
+Dim nadaWOrng As String
+Dim rangeNEWOrng As String
+Dim Titulos As String
+Dim TitulosOFF As String
+
+SDrng = "B2:D2"
+SOrng = "F2:H2"
+WDrng = "J2:L2"
+WOrng = "N2:P2"
+
+Worksheets(report).Columns("B:D").ColumnWidth = 12.57
+Worksheets(report).Columns("E:E").ColumnWidth = 1
+Worksheets(report).Columns("F:H").ColumnWidth = 12.57
+Worksheets(report).Columns("I:I").ColumnWidth = 1
+Worksheets(report).Columns("J:L").ColumnWidth = 12.57
+Worksheets(report).Columns("M:M").ColumnWidth = 1
+Worksheets(report).Columns("N:P").ColumnWidth = 12.57
+
+Worksheets(report).range("A4").Value = "Avanço Realizado (Concluídos)"
+Worksheets(report).range("A5").Value = "Em preenchimento"
+Worksheets(report).Rows("6:6").RowHeight = 8.25
+Worksheets(report).range("A7").Value = "GAP em Análise"
+Worksheets(report).range("A8").Value = "Plano de Ação Sem Data Prevista"
+Worksheets(report).range("A9").Value = "Plano de Ação Sem Data Realizada"
+Worksheets(report).range("A10").Value = "Plano de Ação Aguardando Análise QA"
+Worksheets(report).range("A11").Value = "Plano de Ação Aguardando Conclusão"
+Worksheets(report).range("A12").Value = "Falta Evidência para avançar"
+Worksheets(report).range("A13").Value = "Falta Roteiro de Teste"
+Worksheets(report).Columns("A:A").EntireColumn.AutoFit
+
+'"Self Assessment / Desenho"
+Worksheets(report).range(SDrng).Merge
+Worksheets(report).range(SDrng).Value = "Self Assessment / Desenho"
+Worksheets(report).range(SDrng).Interior.ThemeColor = xlThemeColorDark1
+Worksheets(report).range(SDrng).Interior.Pattern = xlSolid
+Worksheets(report).range(SDrng).Interior.PatternColorIndex = xlAutomatic
+Worksheets(report).range(SDrng).Interior.TintAndShade = -0.149998474074526
+Worksheets(report).range(SDrng).Interior.PatternTintAndShade = 0
+Worksheets(report).range(SDrng).HorizontalAlignment = xlCenter
+Worksheets(report).range(SDrng).VerticalAlignment = xlCenter
+'"Self Assessment / Operação"
+Worksheets(report).range(SOrng).Merge
+Worksheets(report).range(SOrng).Value = "Self Assessment / Operação"
+Worksheets(report).range(SOrng).Interior.ThemeColor = xlThemeColorDark1
+Worksheets(report).range(SOrng).Interior.Pattern = xlSolid
+Worksheets(report).range(SOrng).Interior.PatternColorIndex = xlAutomatic
+Worksheets(report).range(SOrng).Interior.TintAndShade = -0.149998474074526
+Worksheets(report).range(SOrng).Interior.PatternTintAndShade = 0
+Worksheets(report).range(SOrng).HorizontalAlignment = xlCenter
+Worksheets(report).range(SOrng).VerticalAlignment = xlCenter
+'"Walktrough / Desenho"
+Worksheets(report).range(WDrng).Merge
+Worksheets(report).range(WDrng).Value = "Walktrough / Desenho"
+Worksheets(report).range(WDrng).Interior.ThemeColor = xlThemeColorDark1
+Worksheets(report).range(WDrng).Interior.Pattern = xlSolid
+Worksheets(report).range(WDrng).Interior.PatternColorIndex = xlAutomatic
+Worksheets(report).range(WDrng).Interior.TintAndShade = -0.149998474074526
+Worksheets(report).range(WDrng).Interior.PatternTintAndShade = 0
+Worksheets(report).range(WDrng).HorizontalAlignment = xlCenter
+Worksheets(report).range(WDrng).VerticalAlignment = xlCenter
+'"Walktrough / Operação"
+Worksheets(report).range(WOrng).Merge
+Worksheets(report).range(WOrng).Value = "Walktrough / Operação"
+Worksheets(report).range(WOrng).Interior.ThemeColor = xlThemeColorDark1
+Worksheets(report).range(WOrng).Interior.Pattern = xlSolid
+Worksheets(report).range(WOrng).Interior.PatternColorIndex = xlAutomatic
+Worksheets(report).range(WOrng).Interior.TintAndShade = -0.149998474074526
+Worksheets(report).range(WOrng).Interior.PatternTintAndShade = 0
+Worksheets(report).range(WOrng).HorizontalAlignment = xlCenter
+Worksheets(report).range(WOrng).VerticalAlignment = xlCenter
+
+'SD Eficaz
+Worksheets(report).range("B3").Value = "Eficaz"
+Worksheets(report).range("B3").Interior.Pattern = xlSolid
+Worksheets(report).range("B3").Interior.PatternColorIndex = xlAutomatic
+Worksheets(report).range("B3").Interior.ThemeColor = xlThemeColorAccent6
+Worksheets(report).range("B3").Interior.TintAndShade = 0.599993896298105
+Worksheets(report).range("B3").Interior.PatternTintAndShade = 0
+Worksheets(report).range("B3").HorizontalAlignment = xlCenter
+Worksheets(report).range("B3").VerticalAlignment = xlCenter
+'SD Não Eficaz
+Worksheets(report).range("C3").Value = "Não Eficaz"
+Worksheets(report).range("C3").Interior.Pattern = xlSolid
+Worksheets(report).range("C3").Interior.PatternColorIndex = xlAutomatic
+Worksheets(report).range("C3").Interior.ThemeColor = xlThemeColorAccent2
+Worksheets(report).range("C3").Interior.TintAndShade = 0.599993896298105
+Worksheets(report).range("C3").Interior.PatternTintAndShade = 0
+Worksheets(report).range("C3").HorizontalAlignment = xlCenter
+Worksheets(report).range("C3").VerticalAlignment = xlCenter
+'SD Não Aplicável
+Worksheets(report).range("D3").Value = "Não Aplicável"
+Worksheets(report).range("D3").Interior.Pattern = xlSolid
+Worksheets(report).range("D3").Interior.PatternColorIndex = xlAutomatic
+Worksheets(report).range("D3").Interior.ThemeColor = xlThemeColorDark2
+Worksheets(report).range("D3").Interior.TintAndShade = 0
+Worksheets(report).range("D3").Interior.PatternTintAndShade = 0
+Worksheets(report).range("D3").HorizontalAlignment = xlCenter
+Worksheets(report).range("D3").VerticalAlignment = xlCenter
+
+'SO Eficaz
+Worksheets(report).range("F3").Value = "Eficaz"
+Worksheets(report).range("F3").Interior.Pattern = xlSolid
+Worksheets(report).range("F3").Interior.PatternColorIndex = xlAutomatic
+Worksheets(report).range("F3").Interior.ThemeColor = xlThemeColorAccent6
+Worksheets(report).range("F3").Interior.TintAndShade = 0.599993896298105
+Worksheets(report).range("F3").Interior.PatternTintAndShade = 0
+Worksheets(report).range("F3").HorizontalAlignment = xlCenter
+Worksheets(report).range("F3").VerticalAlignment = xlCenter
+'SO Não Eficaz
+Worksheets(report).range("G3").Value = "Não Eficaz"
+Worksheets(report).range("G3").Interior.Pattern = xlSolid
+Worksheets(report).range("G3").Interior.PatternColorIndex = xlAutomatic
+Worksheets(report).range("G3").Interior.ThemeColor = xlThemeColorAccent2
+Worksheets(report).range("G3").Interior.TintAndShade = 0.599993896298105
+Worksheets(report).range("G3").Interior.PatternTintAndShade = 0
+Worksheets(report).range("G3").HorizontalAlignment = xlCenter
+Worksheets(report).range("G3").VerticalAlignment = xlCenter
+'SO Não Aplicável
+Worksheets(report).range("H3").Value = "Não Aplicável"
+Worksheets(report).range("H3").Interior.Pattern = xlSolid
+Worksheets(report).range("H3").Interior.PatternColorIndex = xlAutomatic
+Worksheets(report).range("H3").Interior.ThemeColor = xlThemeColorDark2
+Worksheets(report).range("H3").Interior.TintAndShade = 0
+Worksheets(report).range("H3").Interior.PatternTintAndShade = 0
+Worksheets(report).range("H3").HorizontalAlignment = xlCenter
+Worksheets(report).range("H3").VerticalAlignment = xlCenter
+
+'WD Eficaz
+Worksheets(report).range("J3").Value = "Eficaz"
+Worksheets(report).range("J3").Interior.Pattern = xlSolid
+Worksheets(report).range("J3").Interior.PatternColorIndex = xlAutomatic
+Worksheets(report).range("J3").Interior.ThemeColor = xlThemeColorAccent6
+Worksheets(report).range("J3").Interior.TintAndShade = 0.599993896298105
+Worksheets(report).range("J3").Interior.PatternTintAndShade = 0
+Worksheets(report).range("J3").HorizontalAlignment = xlCenter
+Worksheets(report).range("J3").VerticalAlignment = xlCenter
+'WD Não Eficaz
+Worksheets(report).range("K3").Value = "Não Eficaz"
+Worksheets(report).range("K3").Interior.Pattern = xlSolid
+Worksheets(report).range("K3").Interior.PatternColorIndex = xlAutomatic
+Worksheets(report).range("K3").Interior.ThemeColor = xlThemeColorAccent2
+Worksheets(report).range("K3").Interior.TintAndShade = 0.599993896298105
+Worksheets(report).range("K3").Interior.PatternTintAndShade = 0
+Worksheets(report).range("K3").HorizontalAlignment = xlCenter
+Worksheets(report).range("K3").VerticalAlignment = xlCenter
+'WD Não Aplicável
+Worksheets(report).range("L3").Value = "Não Aplicável"
+Worksheets(report).range("L3").Interior.Pattern = xlSolid
+Worksheets(report).range("L3").Interior.PatternColorIndex = xlAutomatic
+Worksheets(report).range("L3").Interior.ThemeColor = xlThemeColorDark2
+Worksheets(report).range("L3").Interior.TintAndShade = 0
+Worksheets(report).range("L3").Interior.PatternTintAndShade = 0
+Worksheets(report).range("L3").HorizontalAlignment = xlCenter
+Worksheets(report).range("L3").VerticalAlignment = xlCenter
+
+'WO Eficaz
+Worksheets(report).range("N3").Value = "Eficaz"
+Worksheets(report).range("N3").Interior.Pattern = xlSolid
+Worksheets(report).range("N3").Interior.PatternColorIndex = xlAutomatic
+Worksheets(report).range("N3").Interior.ThemeColor = xlThemeColorAccent6
+Worksheets(report).range("N3").Interior.TintAndShade = 0.599993896298105
+Worksheets(report).range("N3").Interior.PatternTintAndShade = 0
+Worksheets(report).range("N3").HorizontalAlignment = xlCenter
+Worksheets(report).range("N3").VerticalAlignment = xlCenter
+'WO Não Eficaz
+Worksheets(report).range("O3").Value = "Não Eficaz"
+Worksheets(report).range("O3").Interior.Pattern = xlSolid
+Worksheets(report).range("O3").Interior.PatternColorIndex = xlAutomatic
+Worksheets(report).range("O3").Interior.ThemeColor = xlThemeColorAccent2
+Worksheets(report).range("O3").Interior.TintAndShade = 0.599993896298105
+Worksheets(report).range("O3").Interior.PatternTintAndShade = 0
+Worksheets(report).range("O3").HorizontalAlignment = xlCenter
+Worksheets(report).range("O3").VerticalAlignment = xlCenter
+'WO Não Aplicável
+Worksheets(report).range("P3").Value = "Não Aplicável"
+Worksheets(report).range("P3").Interior.Pattern = xlSolid
+Worksheets(report).range("P3").Interior.PatternColorIndex = xlAutomatic
+Worksheets(report).range("P3").Interior.ThemeColor = xlThemeColorDark2
+Worksheets(report).range("P3").Interior.TintAndShade = 0
+Worksheets(report).range("P3").Interior.PatternTintAndShade = 0
+Worksheets(report).range("P3").HorizontalAlignment = xlCenter
+Worksheets(report).range("P3").VerticalAlignment = xlCenter
+    
+allSDrng = "B2:D13"
+Worksheets(report).range(allSDrng).HorizontalAlignment = xlCenter
+Worksheets(report).range(allSDrng).Borders(xlDiagonalDown).LineStyle = xlNone
+Worksheets(report).range(allSDrng).Borders(xlDiagonalUp).LineStyle = xlNone
+Worksheets(report).range(allSDrng).Borders(xlEdgeLeft).LineStyle = xlContinuous
+Worksheets(report).range(allSDrng).Borders(xlEdgeLeft).ColorIndex = 0
+Worksheets(report).range(allSDrng).Borders(xlEdgeLeft).TintAndShade = 0
+Worksheets(report).range(allSDrng).Borders(xlEdgeLeft).Weight = xlThin
+Worksheets(report).range(allSDrng).Borders(xlEdgeTop).LineStyle = xlContinuous
+Worksheets(report).range(allSDrng).Borders(xlEdgeTop).ColorIndex = 0
+Worksheets(report).range(allSDrng).Borders(xlEdgeTop).TintAndShade = 0
+Worksheets(report).range(allSDrng).Borders(xlEdgeTop).Weight = xlThin
+Worksheets(report).range(allSDrng).Borders(xlEdgeBottom).LineStyle = xlContinuous
+Worksheets(report).range(allSDrng).Borders(xlEdgeBottom).ColorIndex = 0
+Worksheets(report).range(allSDrng).Borders(xlEdgeBottom).TintAndShade = 0
+Worksheets(report).range(allSDrng).Borders(xlEdgeBottom).Weight = xlThin
+Worksheets(report).range(allSDrng).Borders(xlEdgeRight).LineStyle = xlContinuous
+Worksheets(report).range(allSDrng).Borders(xlEdgeRight).ColorIndex = 0
+Worksheets(report).range(allSDrng).Borders(xlEdgeRight).TintAndShade = 0
+Worksheets(report).range(allSDrng).Borders(xlEdgeRight).Weight = xlThin
+Worksheets(report).range(allSDrng).Borders(xlInsideVertical).LineStyle = xlContinuous
+Worksheets(report).range(allSDrng).Borders(xlInsideVertical).ColorIndex = 0
+Worksheets(report).range(allSDrng).Borders(xlInsideVertical).TintAndShade = 0
+Worksheets(report).range(allSDrng).Borders(xlInsideVertical).Weight = xlThin
+Worksheets(report).range(allSDrng).Borders(xlInsideHorizontal).LineStyle = xlContinuous
+Worksheets(report).range(allSDrng).Borders(xlInsideHorizontal).ColorIndex = 0
+Worksheets(report).range(allSDrng).Borders(xlInsideHorizontal).TintAndShade = 0
+Worksheets(report).range(allSDrng).Borders(xlInsideHorizontal).Weight = xlThin
+
+nadaSDrng = "B6:D6"
+Worksheets(report).range(nadaSDrng).Borders(xlDiagonalDown).LineStyle = xlNone
+Worksheets(report).range(nadaSDrng).Borders(xlDiagonalUp).LineStyle = xlNone
+Worksheets(report).range(nadaSDrng).Borders(xlEdgeLeft).LineStyle = xlContinuous
+Worksheets(report).range(nadaSDrng).Borders(xlEdgeLeft).ColorIndex = 0
+Worksheets(report).range(nadaSDrng).Borders(xlEdgeLeft).TintAndShade = 0
+Worksheets(report).range(nadaSDrng).Borders(xlEdgeLeft).Weight = xlThin
+Worksheets(report).range(nadaSDrng).Borders(xlEdgeTop).LineStyle = xlContinuous
+Worksheets(report).range(nadaSDrng).Borders(xlEdgeTop).ColorIndex = 0
+Worksheets(report).range(nadaSDrng).Borders(xlEdgeTop).TintAndShade = 0
+Worksheets(report).range(nadaSDrng).Borders(xlEdgeTop).Weight = xlThin
+Worksheets(report).range(nadaSDrng).Borders(xlEdgeBottom).LineStyle = xlContinuous
+Worksheets(report).range(nadaSDrng).Borders(xlEdgeBottom).ColorIndex = 0
+Worksheets(report).range(nadaSDrng).Borders(xlEdgeBottom).TintAndShade = 0
+Worksheets(report).range(nadaSDrng).Borders(xlEdgeBottom).Weight = xlThin
+Worksheets(report).range(nadaSDrng).Borders(xlEdgeRight).LineStyle = xlContinuous
+Worksheets(report).range(nadaSDrng).Borders(xlEdgeRight).ColorIndex = 0
+Worksheets(report).range(nadaSDrng).Borders(xlEdgeRight).TintAndShade = 0
+Worksheets(report).range(nadaSDrng).Borders(xlEdgeRight).Weight = xlThin
+Worksheets(report).range(nadaSDrng).Borders(xlInsideVertical).LineStyle = xlNone
+Worksheets(report).range(nadaSDrng).Borders(xlInsideHorizontal).LineStyle = xlNone
+    
+rangeNESDrng = "B7:D13"
+Worksheets(report).range(rangeNESDrng).Borders(xlDiagonalDown).LineStyle = xlNone
+Worksheets(report).range(rangeNESDrng).Borders(xlDiagonalUp).LineStyle = xlNone
+Worksheets(report).range(rangeNESDrng).Borders(xlEdgeLeft).LineStyle = xlContinuous
+Worksheets(report).range(rangeNESDrng).Borders(xlEdgeLeft).ColorIndex = 0
+Worksheets(report).range(rangeNESDrng).Borders(xlEdgeLeft).TintAndShade = 0
+Worksheets(report).range(rangeNESDrng).Borders(xlEdgeLeft).Weight = xlThin
+Worksheets(report).range(rangeNESDrng).Borders(xlEdgeTop).LineStyle = xlContinuous
+Worksheets(report).range(rangeNESDrng).Borders(xlEdgeTop).ColorIndex = 0
+Worksheets(report).range(rangeNESDrng).Borders(xlEdgeTop).TintAndShade = 0
+Worksheets(report).range(rangeNESDrng).Borders(xlEdgeTop).Weight = xlThin
+Worksheets(report).range(rangeNESDrng).Borders(xlEdgeBottom).LineStyle = xlContinuous
+Worksheets(report).range(rangeNESDrng).Borders(xlEdgeBottom).ColorIndex = 0
+Worksheets(report).range(rangeNESDrng).Borders(xlEdgeBottom).TintAndShade = 0
+Worksheets(report).range(rangeNESDrng).Borders(xlEdgeBottom).Weight = xlThin
+Worksheets(report).range(rangeNESDrng).Borders(xlEdgeRight).LineStyle = xlContinuous
+Worksheets(report).range(rangeNESDrng).Borders(xlEdgeRight).ColorIndex = 0
+Worksheets(report).range(rangeNESDrng).Borders(xlEdgeRight).TintAndShade = 0
+Worksheets(report).range(rangeNESDrng).Borders(xlEdgeRight).Weight = xlThin
+Worksheets(report).range(rangeNESDrng).Borders(xlInsideVertical).LineStyle = xlContinuous
+Worksheets(report).range(rangeNESDrng).Borders(xlInsideVertical).ColorIndex = 0
+Worksheets(report).range(rangeNESDrng).Borders(xlInsideVertical).TintAndShade = 0
+Worksheets(report).range(rangeNESDrng).Borders(xlInsideVertical).Weight = xlHairline
+Worksheets(report).range(rangeNESDrng).Borders(xlInsideHorizontal).LineStyle = xlContinuous
+Worksheets(report).range(rangeNESDrng).Borders(xlInsideHorizontal).ColorIndex = 0
+Worksheets(report).range(rangeNESDrng).Borders(xlInsideHorizontal).TintAndShade = 0
+Worksheets(report).range(rangeNESDrng).Borders(xlInsideHorizontal).Weight = xlHairline
+
+allSOrng = "F2:H13"
+
+Worksheets(report).range(allSOrng).HorizontalAlignment = xlCenter
+Worksheets(report).range(allSOrng).Borders(xlDiagonalDown).LineStyle = xlNone
+Worksheets(report).range(allSOrng).Borders(xlDiagonalUp).LineStyle = xlNone
+Worksheets(report).range(allSOrng).Borders(xlEdgeLeft).LineStyle = xlContinuous
+Worksheets(report).range(allSOrng).Borders(xlEdgeLeft).ColorIndex = 0
+Worksheets(report).range(allSOrng).Borders(xlEdgeLeft).TintAndShade = 0
+Worksheets(report).range(allSOrng).Borders(xlEdgeLeft).Weight = xlThin
+Worksheets(report).range(allSOrng).Borders(xlEdgeTop).LineStyle = xlContinuous
+Worksheets(report).range(allSOrng).Borders(xlEdgeTop).ColorIndex = 0
+Worksheets(report).range(allSOrng).Borders(xlEdgeTop).TintAndShade = 0
+Worksheets(report).range(allSOrng).Borders(xlEdgeTop).Weight = xlThin
+Worksheets(report).range(allSOrng).Borders(xlEdgeBottom).LineStyle = xlContinuous
+Worksheets(report).range(allSOrng).Borders(xlEdgeBottom).ColorIndex = 0
+Worksheets(report).range(allSOrng).Borders(xlEdgeBottom).TintAndShade = 0
+Worksheets(report).range(allSOrng).Borders(xlEdgeBottom).Weight = xlThin
+Worksheets(report).range(allSOrng).Borders(xlEdgeRight).LineStyle = xlContinuous
+Worksheets(report).range(allSOrng).Borders(xlEdgeRight).ColorIndex = 0
+Worksheets(report).range(allSOrng).Borders(xlEdgeRight).TintAndShade = 0
+Worksheets(report).range(allSOrng).Borders(xlEdgeRight).Weight = xlThin
+Worksheets(report).range(allSOrng).Borders(xlInsideVertical).LineStyle = xlContinuous
+Worksheets(report).range(allSOrng).Borders(xlInsideVertical).ColorIndex = 0
+Worksheets(report).range(allSOrng).Borders(xlInsideVertical).TintAndShade = 0
+Worksheets(report).range(allSOrng).Borders(xlInsideVertical).Weight = xlThin
+Worksheets(report).range(allSOrng).Borders(xlInsideHorizontal).LineStyle = xlContinuous
+Worksheets(report).range(allSOrng).Borders(xlInsideHorizontal).ColorIndex = 0
+Worksheets(report).range(allSOrng).Borders(xlInsideHorizontal).TintAndShade = 0
+Worksheets(report).range(allSOrng).Borders(xlInsideHorizontal).Weight = xlThin
+
+nadaSOrng = "F6:H6"
+
+Worksheets(report).range(nadaSOrng).Borders(xlDiagonalDown).LineStyle = xlNone
+Worksheets(report).range(nadaSOrng).Borders(xlDiagonalUp).LineStyle = xlNone
+Worksheets(report).range(nadaSOrng).Borders(xlEdgeLeft).LineStyle = xlContinuous
+Worksheets(report).range(nadaSOrng).Borders(xlEdgeLeft).ColorIndex = 0
+Worksheets(report).range(nadaSOrng).Borders(xlEdgeLeft).TintAndShade = 0
+Worksheets(report).range(nadaSOrng).Borders(xlEdgeLeft).Weight = xlThin
+Worksheets(report).range(nadaSOrng).Borders(xlEdgeTop).LineStyle = xlContinuous
+Worksheets(report).range(nadaSOrng).Borders(xlEdgeTop).ColorIndex = 0
+Worksheets(report).range(nadaSOrng).Borders(xlEdgeTop).TintAndShade = 0
+Worksheets(report).range(nadaSOrng).Borders(xlEdgeTop).Weight = xlThin
+Worksheets(report).range(nadaSOrng).Borders(xlEdgeBottom).LineStyle = xlContinuous
+Worksheets(report).range(nadaSOrng).Borders(xlEdgeBottom).ColorIndex = 0
+Worksheets(report).range(nadaSOrng).Borders(xlEdgeBottom).TintAndShade = 0
+Worksheets(report).range(nadaSOrng).Borders(xlEdgeBottom).Weight = xlThin
+Worksheets(report).range(nadaSOrng).Borders(xlEdgeRight).LineStyle = xlContinuous
+Worksheets(report).range(nadaSOrng).Borders(xlEdgeRight).ColorIndex = 0
+Worksheets(report).range(nadaSOrng).Borders(xlEdgeRight).TintAndShade = 0
+Worksheets(report).range(nadaSOrng).Borders(xlEdgeRight).Weight = xlThin
+Worksheets(report).range(nadaSOrng).Borders(xlInsideVertical).LineStyle = xlNone
+Worksheets(report).range(nadaSOrng).Borders(xlInsideHorizontal).LineStyle = xlNone
+    
+rangeNESOrng = "F7:H13"
+'With
+'End With
+Worksheets(report).range(rangeNESOrng).Borders(xlDiagonalDown).LineStyle = xlNone
+Worksheets(report).range(rangeNESOrng).Borders(xlDiagonalUp).LineStyle = xlNone
+Worksheets(report).range(rangeNESOrng).Borders(xlEdgeLeft).LineStyle = xlContinuous
+Worksheets(report).range(rangeNESOrng).Borders(xlEdgeLeft).ColorIndex = 0
+Worksheets(report).range(rangeNESOrng).Borders(xlEdgeLeft).TintAndShade = 0
+Worksheets(report).range(rangeNESOrng).Borders(xlEdgeLeft).Weight = xlThin
+Worksheets(report).range(rangeNESOrng).Borders(xlEdgeTop).LineStyle = xlContinuous
+Worksheets(report).range(rangeNESOrng).Borders(xlEdgeTop).ColorIndex = 0
+Worksheets(report).range(rangeNESOrng).Borders(xlEdgeTop).TintAndShade = 0
+Worksheets(report).range(rangeNESOrng).Borders(xlEdgeTop).Weight = xlThin
+Worksheets(report).range(rangeNESOrng).Borders(xlEdgeBottom).LineStyle = xlContinuous
+Worksheets(report).range(rangeNESOrng).Borders(xlEdgeBottom).ColorIndex = 0
+Worksheets(report).range(rangeNESOrng).Borders(xlEdgeBottom).TintAndShade = 0
+Worksheets(report).range(rangeNESOrng).Borders(xlEdgeBottom).Weight = xlThin
+Worksheets(report).range(rangeNESOrng).Borders(xlEdgeRight).LineStyle = xlContinuous
+Worksheets(report).range(rangeNESOrng).Borders(xlEdgeRight).ColorIndex = 0
+Worksheets(report).range(rangeNESOrng).Borders(xlEdgeRight).TintAndShade = 0
+Worksheets(report).range(rangeNESOrng).Borders(xlEdgeRight).Weight = xlThin
+Worksheets(report).range(rangeNESOrng).Borders(xlInsideVertical).LineStyle = xlContinuous
+Worksheets(report).range(rangeNESOrng).Borders(xlInsideVertical).ColorIndex = 0
+Worksheets(report).range(rangeNESOrng).Borders(xlInsideVertical).TintAndShade = 0
+Worksheets(report).range(rangeNESOrng).Borders(xlInsideVertical).Weight = xlHairline
+Worksheets(report).range(rangeNESOrng).Borders(xlInsideHorizontal).LineStyle = xlContinuous
+Worksheets(report).range(rangeNESOrng).Borders(xlInsideHorizontal).ColorIndex = 0
+Worksheets(report).range(rangeNESOrng).Borders(xlInsideHorizontal).TintAndShade = 0
+Worksheets(report).range(rangeNESOrng).Borders(xlInsideHorizontal).Weight = xlHairline
+
+
+allWDrng = "J2:L13"
+
+Worksheets(report).range(allWDrng).HorizontalAlignment = xlCenter
+Worksheets(report).range(allWDrng).Borders(xlDiagonalDown).LineStyle = xlNone
+Worksheets(report).range(allWDrng).Borders(xlDiagonalUp).LineStyle = xlNone
+Worksheets(report).range(allWDrng).Borders(xlEdgeLeft).LineStyle = xlContinuous
+Worksheets(report).range(allWDrng).Borders(xlEdgeLeft).ColorIndex = 0
+Worksheets(report).range(allWDrng).Borders(xlEdgeLeft).TintAndShade = 0
+Worksheets(report).range(allWDrng).Borders(xlEdgeLeft).Weight = xlThin
+Worksheets(report).range(allWDrng).Borders(xlEdgeTop).LineStyle = xlContinuous
+Worksheets(report).range(allWDrng).Borders(xlEdgeTop).ColorIndex = 0
+Worksheets(report).range(allWDrng).Borders(xlEdgeTop).TintAndShade = 0
+Worksheets(report).range(allWDrng).Borders(xlEdgeTop).Weight = xlThin
+Worksheets(report).range(allWDrng).Borders(xlEdgeBottom).LineStyle = xlContinuous
+Worksheets(report).range(allWDrng).Borders(xlEdgeBottom).ColorIndex = 0
+Worksheets(report).range(allWDrng).Borders(xlEdgeBottom).TintAndShade = 0
+Worksheets(report).range(allWDrng).Borders(xlEdgeBottom).Weight = xlThin
+Worksheets(report).range(allWDrng).Borders(xlEdgeRight).LineStyle = xlContinuous
+Worksheets(report).range(allWDrng).Borders(xlEdgeRight).ColorIndex = 0
+Worksheets(report).range(allWDrng).Borders(xlEdgeRight).TintAndShade = 0
+Worksheets(report).range(allWDrng).Borders(xlEdgeRight).Weight = xlThin
+Worksheets(report).range(allWDrng).Borders(xlInsideVertical).LineStyle = xlContinuous
+Worksheets(report).range(allWDrng).Borders(xlInsideVertical).ColorIndex = 0
+Worksheets(report).range(allWDrng).Borders(xlInsideVertical).TintAndShade = 0
+Worksheets(report).range(allWDrng).Borders(xlInsideVertical).Weight = xlThin
+Worksheets(report).range(allWDrng).Borders(xlInsideHorizontal).LineStyle = xlContinuous
+Worksheets(report).range(allWDrng).Borders(xlInsideHorizontal).ColorIndex = 0
+Worksheets(report).range(allWDrng).Borders(xlInsideHorizontal).TintAndShade = 0
+Worksheets(report).range(allWDrng).Borders(xlInsideHorizontal).Weight = xlThin
+
+nadaWDrng = "J6:L6"
+Worksheets(report).range(nadaWDrng).Borders(xlDiagonalDown).LineStyle = xlNone
+Worksheets(report).range(nadaWDrng).Borders(xlDiagonalUp).LineStyle = xlNone
+Worksheets(report).range(nadaWDrng).Borders(xlEdgeLeft).LineStyle = xlContinuous
+Worksheets(report).range(nadaWDrng).Borders(xlEdgeLeft).ColorIndex = 0
+Worksheets(report).range(nadaWDrng).Borders(xlEdgeLeft).TintAndShade = 0
+Worksheets(report).range(nadaWDrng).Borders(xlEdgeLeft).Weight = xlThin
+Worksheets(report).range(nadaWDrng).Borders(xlEdgeTop).LineStyle = xlContinuous
+Worksheets(report).range(nadaWDrng).Borders(xlEdgeTop).ColorIndex = 0
+Worksheets(report).range(nadaWDrng).Borders(xlEdgeTop).TintAndShade = 0
+Worksheets(report).range(nadaWDrng).Borders(xlEdgeTop).Weight = xlThin
+Worksheets(report).range(nadaWDrng).Borders(xlEdgeBottom).LineStyle = xlContinuous
+Worksheets(report).range(nadaWDrng).Borders(xlEdgeBottom).ColorIndex = 0
+Worksheets(report).range(nadaWDrng).Borders(xlEdgeBottom).TintAndShade = 0
+Worksheets(report).range(nadaWDrng).Borders(xlEdgeBottom).Weight = xlThin
+Worksheets(report).range(nadaWDrng).Borders(xlEdgeRight).LineStyle = xlContinuous
+Worksheets(report).range(nadaWDrng).Borders(xlEdgeRight).ColorIndex = 0
+Worksheets(report).range(nadaWDrng).Borders(xlEdgeRight).TintAndShade = 0
+Worksheets(report).range(nadaWDrng).Borders(xlEdgeRight).Weight = xlThin
+Worksheets(report).range(nadaWDrng).Borders(xlInsideVertical).LineStyle = xlNone
+Worksheets(report).range(nadaWDrng).Borders(xlInsideHorizontal).LineStyle = xlNone
+    
+rangeNEWDrng = "J7:L13"
+Worksheets(report).range(rangeNEWDrng).Borders(xlDiagonalDown).LineStyle = xlNone
+Worksheets(report).range(rangeNEWDrng).Borders(xlDiagonalUp).LineStyle = xlNone
+Worksheets(report).range(rangeNEWDrng).Borders(xlEdgeLeft).LineStyle = xlContinuous
+Worksheets(report).range(rangeNEWDrng).Borders(xlEdgeLeft).ColorIndex = 0
+Worksheets(report).range(rangeNEWDrng).Borders(xlEdgeLeft).TintAndShade = 0
+Worksheets(report).range(rangeNEWDrng).Borders(xlEdgeLeft).Weight = xlThin
+Worksheets(report).range(rangeNEWDrng).Borders(xlEdgeTop).LineStyle = xlContinuous
+Worksheets(report).range(rangeNEWDrng).Borders(xlEdgeTop).ColorIndex = 0
+Worksheets(report).range(rangeNEWDrng).Borders(xlEdgeTop).TintAndShade = 0
+Worksheets(report).range(rangeNEWDrng).Borders(xlEdgeTop).Weight = xlThin
+Worksheets(report).range(rangeNEWDrng).Borders(xlEdgeBottom).LineStyle = xlContinuous
+Worksheets(report).range(rangeNEWDrng).Borders(xlEdgeBottom).ColorIndex = 0
+Worksheets(report).range(rangeNEWDrng).Borders(xlEdgeBottom).TintAndShade = 0
+Worksheets(report).range(rangeNEWDrng).Borders(xlEdgeBottom).Weight = xlThin
+Worksheets(report).range(rangeNEWDrng).Borders(xlEdgeRight).LineStyle = xlContinuous
+Worksheets(report).range(rangeNEWDrng).Borders(xlEdgeRight).ColorIndex = 0
+Worksheets(report).range(rangeNEWDrng).Borders(xlEdgeRight).TintAndShade = 0
+Worksheets(report).range(rangeNEWDrng).Borders(xlEdgeRight).Weight = xlThin
+Worksheets(report).range(rangeNEWDrng).Borders(xlInsideVertical).LineStyle = xlContinuous
+Worksheets(report).range(rangeNEWDrng).Borders(xlInsideVertical).ColorIndex = 0
+Worksheets(report).range(rangeNEWDrng).Borders(xlInsideVertical).TintAndShade = 0
+Worksheets(report).range(rangeNEWDrng).Borders(xlInsideVertical).Weight = xlHairline
+Worksheets(report).range(rangeNEWDrng).Borders(xlInsideHorizontal).LineStyle = xlContinuous
+Worksheets(report).range(rangeNEWDrng).Borders(xlInsideHorizontal).ColorIndex = 0
+Worksheets(report).range(rangeNEWDrng).Borders(xlInsideHorizontal).TintAndShade = 0
+Worksheets(report).range(rangeNEWDrng).Borders(xlInsideHorizontal).Weight = xlHairline
+
+allWOrng = "N2:P13"
+
+Worksheets(report).range(allWOrng).HorizontalAlignment = xlCenter
+Worksheets(report).range(allWOrng).Borders(xlDiagonalDown).LineStyle = xlNone
+Worksheets(report).range(allWOrng).Borders(xlDiagonalUp).LineStyle = xlNone
+Worksheets(report).range(allWOrng).Borders(xlEdgeLeft).LineStyle = xlContinuous
+Worksheets(report).range(allWOrng).Borders(xlEdgeLeft).ColorIndex = 0
+Worksheets(report).range(allWOrng).Borders(xlEdgeLeft).TintAndShade = 0
+Worksheets(report).range(allWOrng).Borders(xlEdgeLeft).Weight = xlThin
+Worksheets(report).range(allWOrng).Borders(xlEdgeTop).LineStyle = xlContinuous
+Worksheets(report).range(allWOrng).Borders(xlEdgeTop).ColorIndex = 0
+Worksheets(report).range(allWOrng).Borders(xlEdgeTop).TintAndShade = 0
+Worksheets(report).range(allWOrng).Borders(xlEdgeTop).Weight = xlThin
+Worksheets(report).range(allWOrng).Borders(xlEdgeBottom).LineStyle = xlContinuous
+Worksheets(report).range(allWOrng).Borders(xlEdgeBottom).ColorIndex = 0
+Worksheets(report).range(allWOrng).Borders(xlEdgeBottom).TintAndShade = 0
+Worksheets(report).range(allWOrng).Borders(xlEdgeBottom).Weight = xlThin
+Worksheets(report).range(allWOrng).Borders(xlEdgeRight).LineStyle = xlContinuous
+Worksheets(report).range(allWOrng).Borders(xlEdgeRight).ColorIndex = 0
+Worksheets(report).range(allWOrng).Borders(xlEdgeRight).TintAndShade = 0
+Worksheets(report).range(allWOrng).Borders(xlEdgeRight).Weight = xlThin
+Worksheets(report).range(allWOrng).Borders(xlInsideVertical).LineStyle = xlContinuous
+Worksheets(report).range(allWOrng).Borders(xlInsideVertical).ColorIndex = 0
+Worksheets(report).range(allWOrng).Borders(xlInsideVertical).TintAndShade = 0
+Worksheets(report).range(allWOrng).Borders(xlInsideVertical).Weight = xlThin
+Worksheets(report).range(allWOrng).Borders(xlInsideHorizontal).LineStyle = xlContinuous
+Worksheets(report).range(allWOrng).Borders(xlInsideHorizontal).ColorIndex = 0
+Worksheets(report).range(allWOrng).Borders(xlInsideHorizontal).TintAndShade = 0
+Worksheets(report).range(allWOrng).Borders(xlInsideHorizontal).Weight = xlThin
+
+nadaWOrng = "N6:P6"
+Worksheets(report).range(nadaWOrng).Borders(xlDiagonalDown).LineStyle = xlNone
+Worksheets(report).range(nadaWOrng).Borders(xlDiagonalUp).LineStyle = xlNone
+Worksheets(report).range(nadaWOrng).Borders(xlEdgeLeft).LineStyle = xlContinuous
+Worksheets(report).range(nadaWOrng).Borders(xlEdgeLeft).ColorIndex = 0
+Worksheets(report).range(nadaWOrng).Borders(xlEdgeLeft).TintAndShade = 0
+Worksheets(report).range(nadaWOrng).Borders(xlEdgeLeft).Weight = xlThin
+Worksheets(report).range(nadaWOrng).Borders(xlEdgeTop).LineStyle = xlContinuous
+Worksheets(report).range(nadaWOrng).Borders(xlEdgeTop).ColorIndex = 0
+Worksheets(report).range(nadaWOrng).Borders(xlEdgeTop).TintAndShade = 0
+Worksheets(report).range(nadaWOrng).Borders(xlEdgeTop).Weight = xlThin
+Worksheets(report).range(nadaWOrng).Borders(xlEdgeBottom).LineStyle = xlContinuous
+Worksheets(report).range(nadaWOrng).Borders(xlEdgeBottom).ColorIndex = 0
+Worksheets(report).range(nadaWOrng).Borders(xlEdgeBottom).TintAndShade = 0
+Worksheets(report).range(nadaWOrng).Borders(xlEdgeBottom).Weight = xlThin
+Worksheets(report).range(nadaWOrng).Borders(xlEdgeRight).LineStyle = xlContinuous
+Worksheets(report).range(nadaWOrng).Borders(xlEdgeRight).ColorIndex = 0
+Worksheets(report).range(nadaWOrng).Borders(xlEdgeRight).TintAndShade = 0
+Worksheets(report).range(nadaWOrng).Borders(xlEdgeRight).Weight = xlThin
+Worksheets(report).range(nadaWOrng).Borders(xlInsideVertical).LineStyle = xlNone
+Worksheets(report).range(nadaWOrng).Borders(xlInsideHorizontal).LineStyle = xlNone
+    
+rangeNEWOrng = "N7:P13"
+Worksheets(report).range(rangeNEWOrng).Borders(xlDiagonalDown).LineStyle = xlNone
+Worksheets(report).range(rangeNEWOrng).Borders(xlDiagonalUp).LineStyle = xlNone
+Worksheets(report).range(rangeNEWOrng).Borders(xlEdgeLeft).LineStyle = xlContinuous
+Worksheets(report).range(rangeNEWOrng).Borders(xlEdgeLeft).ColorIndex = 0
+Worksheets(report).range(rangeNEWOrng).Borders(xlEdgeLeft).TintAndShade = 0
+Worksheets(report).range(rangeNEWOrng).Borders(xlEdgeLeft).Weight = xlThin
+Worksheets(report).range(rangeNEWOrng).Borders(xlEdgeTop).LineStyle = xlContinuous
+Worksheets(report).range(rangeNEWOrng).Borders(xlEdgeTop).ColorIndex = 0
+Worksheets(report).range(rangeNEWOrng).Borders(xlEdgeTop).TintAndShade = 0
+Worksheets(report).range(rangeNEWOrng).Borders(xlEdgeTop).Weight = xlThin
+Worksheets(report).range(rangeNEWOrng).Borders(xlEdgeBottom).LineStyle = xlContinuous
+Worksheets(report).range(rangeNEWOrng).Borders(xlEdgeBottom).ColorIndex = 0
+Worksheets(report).range(rangeNEWOrng).Borders(xlEdgeBottom).TintAndShade = 0
+Worksheets(report).range(rangeNEWOrng).Borders(xlEdgeBottom).Weight = xlThin
+Worksheets(report).range(rangeNEWOrng).Borders(xlEdgeRight).LineStyle = xlContinuous
+Worksheets(report).range(rangeNEWOrng).Borders(xlEdgeRight).ColorIndex = 0
+Worksheets(report).range(rangeNEWOrng).Borders(xlEdgeRight).TintAndShade = 0
+Worksheets(report).range(rangeNEWOrng).Borders(xlEdgeRight).Weight = xlThin
+Worksheets(report).range(rangeNEWOrng).Borders(xlInsideVertical).LineStyle = xlContinuous
+Worksheets(report).range(rangeNEWOrng).Borders(xlInsideVertical).ColorIndex = 0
+Worksheets(report).range(rangeNEWOrng).Borders(xlInsideVertical).TintAndShade = 0
+Worksheets(report).range(rangeNEWOrng).Borders(xlInsideVertical).Weight = xlHairline
+Worksheets(report).range(rangeNEWOrng).Borders(xlInsideHorizontal).LineStyle = xlContinuous
+Worksheets(report).range(rangeNEWOrng).Borders(xlInsideHorizontal).ColorIndex = 0
+Worksheets(report).range(rangeNEWOrng).Borders(xlInsideHorizontal).TintAndShade = 0
+Worksheets(report).range(rangeNEWOrng).Borders(xlInsideHorizontal).Weight = xlHairline
+
+
+Titulos = "A4:A13"
+
+'Worksheets(report).range(Titulos).HorizontalAlignment = xlCenter
+Worksheets(report).range(Titulos).Borders(xlDiagonalDown).LineStyle = xlNone
+Worksheets(report).range(Titulos).Borders(xlDiagonalUp).LineStyle = xlNone
+Worksheets(report).range(Titulos).Borders(xlEdgeLeft).LineStyle = xlContinuous
+Worksheets(report).range(Titulos).Borders(xlEdgeLeft).ColorIndex = 0
+Worksheets(report).range(Titulos).Borders(xlEdgeLeft).TintAndShade = 0
+Worksheets(report).range(Titulos).Borders(xlEdgeLeft).Weight = xlThin
+Worksheets(report).range(Titulos).Borders(xlEdgeTop).LineStyle = xlContinuous
+Worksheets(report).range(Titulos).Borders(xlEdgeTop).ColorIndex = 0
+Worksheets(report).range(Titulos).Borders(xlEdgeTop).TintAndShade = 0
+Worksheets(report).range(Titulos).Borders(xlEdgeTop).Weight = xlThin
+Worksheets(report).range(Titulos).Borders(xlEdgeBottom).LineStyle = xlContinuous
+Worksheets(report).range(Titulos).Borders(xlEdgeBottom).ColorIndex = 0
+Worksheets(report).range(Titulos).Borders(xlEdgeBottom).TintAndShade = 0
+Worksheets(report).range(Titulos).Borders(xlEdgeBottom).Weight = xlThin
+Worksheets(report).range(Titulos).Borders(xlEdgeRight).LineStyle = xlContinuous
+Worksheets(report).range(Titulos).Borders(xlEdgeRight).ColorIndex = 0
+Worksheets(report).range(Titulos).Borders(xlEdgeRight).TintAndShade = 0
+Worksheets(report).range(Titulos).Borders(xlEdgeRight).Weight = xlThin
+Worksheets(report).range(Titulos).Borders(xlInsideVertical).LineStyle = xlContinuous
+Worksheets(report).range(Titulos).Borders(xlInsideVertical).ColorIndex = 0
+Worksheets(report).range(Titulos).Borders(xlInsideVertical).TintAndShade = 0
+Worksheets(report).range(Titulos).Borders(xlInsideVertical).Weight = xlThin
+Worksheets(report).range(Titulos).Borders(xlInsideHorizontal).LineStyle = xlContinuous
+Worksheets(report).range(Titulos).Borders(xlInsideHorizontal).ColorIndex = 0
+Worksheets(report).range(Titulos).Borders(xlInsideHorizontal).TintAndShade = 0
+Worksheets(report).range(Titulos).Borders(xlInsideHorizontal).Weight = xlThin
+TitulosOFF = "A6"
+Worksheets(report).range(TitulosOFF).Borders(xlDiagonalDown).LineStyle = xlNone
+Worksheets(report).range(TitulosOFF).Borders(xlDiagonalUp).LineStyle = xlNone
+Worksheets(report).range(TitulosOFF).Borders(xlEdgeLeft).LineStyle = xlNone
+Worksheets(report).range(TitulosOFF).Borders(xlEdgeTop).LineStyle = xlContinuous
+Worksheets(report).range(TitulosOFF).Borders(xlEdgeTop).ColorIndex = 0
+Worksheets(report).range(TitulosOFF).Borders(xlEdgeTop).TintAndShade = 0
+Worksheets(report).range(TitulosOFF).Borders(xlEdgeTop).Weight = xlThin
+Worksheets(report).range(TitulosOFF).Borders(xlEdgeBottom).LineStyle = xlContinuous
+Worksheets(report).range(TitulosOFF).Borders(xlEdgeBottom).ColorIndex = 0
+Worksheets(report).range(TitulosOFF).Borders(xlEdgeBottom).TintAndShade = 0
+Worksheets(report).range(TitulosOFF).Borders(xlEdgeBottom).Weight = xlThin
+Worksheets(report).range(TitulosOFF).Borders(xlEdgeRight).LineStyle = xlContinuous
+Worksheets(report).range(TitulosOFF).Borders(xlEdgeRight).ColorIndex = 0
+Worksheets(report).range(TitulosOFF).Borders(xlEdgeRight).TintAndShade = 0
+Worksheets(report).range(TitulosOFF).Borders(xlEdgeRight).Weight = xlThin
+Worksheets(report).range(TitulosOFF).Borders(xlInsideVertical).LineStyle = xlNone
+Worksheets(report).range(TitulosOFF).Borders(xlInsideHorizontal).LineStyle = xlNone
+
+Application.ActiveWindow.Zoom = 85
+Application.ActiveWindow.DisplayGridlines = False
+
+Err_Control:
+If Err.Number <> 0 Then
+    MsgBox Err.Description
+End If
+
+End Sub

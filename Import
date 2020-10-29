@@ -1,0 +1,557 @@
+Sub CheckIfFileOpen()
+Dim File1 As String
+Dim File2 As String
+Dim File3 As String
+Dim File4 As String
+Dim File5 As String
+Dim ResultFile1 As Byte
+Dim ResultFile2 As Byte
+Dim ResultFile3 As Byte
+Dim ResultFile4 As Byte
+Dim ResultFile5 As Byte
+ResultFile1 = 0
+ResultFile2 = 0
+ResultFile3 = 0
+ResultFile4 = 0
+ResultFile5 = 0
+Dim resultado As String
+
+File1 = "\\MTZNASP001\Compartilhamentos\Recertificacao_Controle_Risco\I&O\RCR_I&O.xlsm"
+File2 = "\\MTZNASP001\Compartilhamentos\Recertificacao_Controle_Risco\I&O_Production\RCR_Production.xlsm"
+File3 = "\\MTZNASP001\Compartilhamentos\Recertificacao_Controle_Risco\I&O_Production - User Support & Delivery\RCR_Production_&_USD.xlsm"
+File4 = "\\MTZNASP001\Compartilhamentos\Recertificacao_Controle_Risco\I&O_Projects\RCR_Projects.xlsm"
+File5 = "\\MTZNASP001\Compartilhamentos\Recertificacao_Controle_Risco\I&O_User Support & Delivery\RCR_USD.xlsm"
+
+If IsFileOpen(File1) = False Then
+Else
+    ResultFile1 = 1 'MsgBox File1 & " is already open."
+End If
+
+If IsFileOpen(File2) = False Then
+Else
+    ResultFile2 = 1
+End If
+
+If IsFileOpen(File3) = False Then
+Else
+    ResultFile3 = 1
+End If
+
+If IsFileOpen(File4) = False Then
+Else
+    ResultFile4 = 1
+End If
+
+If IsFileOpen(File5) = False Then
+Else
+    ResultFile5 = 1
+End If
+
+If (ResultFile1 = 1) Or (ResultFile2 = 1) Or (ResultFile3 = 1) Or (ResultFile4 = 1) Or (ResultFile5 = 1) Then
+    resultado = "Arquivos abertos:"
+    If (ResultFile1 = 1) Then
+        resultado = resultado + Chr(13) & File1
+    End If
+    If (ResultFile2 = 1) Then
+        resultado = resultado + Chr(13) & File2
+    End If
+    If (ResultFile3 = 1) Then
+        resultado = resultado + Chr(13) & File3
+    End If
+    If (ResultFile4 = 1) Then
+        resultado = resultado + Chr(13) & File4
+    End If
+    If (ResultFile5 = 1) Then
+        resultado = resultado + Chr(13) & File5
+    End If
+    MsgBox resultado, vbOKOnly, "Importação - Recertificação de Controle"
+    
+Else
+    If MsgBox("Atualização disponível." & Chr(13) & Chr(13) & "Atualizar?", vbQuestion + vbYesNo, "R.C.R. - Update Database") = vbYes Then
+        Call IMPORTAR_RESPOSTAS
+    End If
+End If
+End Sub
+
+Function IsFileOpen(fileName As String)
+Dim fileNum As Integer
+Dim errNum As Integer
+On Error Resume Next
+fileNum = FreeFile()
+Open fileName For Input Lock Read As #fileNum
+Close fileNum
+errNum = Err
+On Error GoTo 0
+Select Case errNum
+    Case 0
+    IsFileOpen = False
+    Case 70
+    IsFileOpen = True
+    Case Else
+    IsFileOpen = errNum
+End Select
+End Function
+
+
+Function IMPORTAR_RESPOSTAS()
+    Application.EnableEvents = False
+    Application.ScreenUpdating = False
+Dim oListObj As Object
+Dim ThisWB As String
+Dim lngFilecounter As Long
+Dim wbDest As Workbook
+Dim shtDest As Worksheet
+Dim ws As Worksheet
+
+Dim Wkb As Workbook
+Dim CopyRng As range
+Dim Dest As range
+Dim RowofCopySheet As Integer
+
+Dim path1 As String
+Dim fileName1 As String
+Dim path2 As String
+Dim Filename2 As String
+Dim path3 As String
+Dim Filename3 As String
+    
+Call DesProteger_ControlesAvaliacoes
+Call DesProteger_Anexos
+Call DesProteger_PlanosAcao
+Call DesProteger_PlanoAcao_LOG
+Call DesProteger_RoteiroTestes
+
+RowofCopySheet = 2 ' Row to start on in the sheets you are copying from
+'Pasta onde estão os arquivos que serão utilizados para update.
+ThisWB = ActiveWorkbook.Name
+path1 = "\\REDE\Compartilhamentos\Pasta\1\"   'arquivo1.xlsm
+path2 = "\\REDE\Compartilhamentos\Pasta\2\"   'arquivo2.xlsm
+path3 = "\\REDE\Compartilhamentos\Pasta\3"    'arquivo3.xlsm
+path4 = "\\REDE\Compartilhamentos\Pasta\4"    'arquivo4.xlsm
+path5 = "\\REDE\Compartilhamentos\Pasta\5"    'arquivo5.xlsm
+'-------------------------------------------------------------------------------------------------------------------------
+'Limpar Antes de atualizar
+    ThisWorkbook.Worksheets("ControlesAvaliacoes").Select
+    If (ThisWorkbook.Worksheets("ControlesAvaliacoes").UsedRange.Rows.Count) > 1 Then ThisWorkbook.Worksheets("ControlesAvaliacoes").range(ThisWorkbook.Worksheets("ControlesAvaliacoes").Cells(2, 1), ThisWorkbook.Worksheets("ControlesAvaliacoes").Cells(ThisWorkbook.Worksheets("ControlesAvaliacoes").UsedRange.Rows.Count, ThisWorkbook.Worksheets("ControlesAvaliacoes").UsedRange.Columns.Count)).Clear
+    
+    ThisWorkbook.Worksheets("Anexos").Select
+    If (ThisWorkbook.Worksheets("Anexos").UsedRange.Rows.Count) > 1 Then ThisWorkbook.Worksheets("Anexos").range(ThisWorkbook.Worksheets("Anexos").Cells(2, 1), ThisWorkbook.Worksheets("Anexos").Cells(ThisWorkbook.Worksheets("Anexos").UsedRange.Rows.Count, ThisWorkbook.Worksheets("Anexos").UsedRange.Columns.Count)).Clear
+    For Each obj In ThisWorkbook.Worksheets("Anexos").Shapes
+        If obj.Name <> "" Then obj.Delete
+    Next obj
+    
+    ThisWorkbook.Worksheets("PlanosAcao").Select
+    If (ThisWorkbook.Worksheets("PlanosAcao").UsedRange.Rows.Count) > 1 Then ThisWorkbook.Worksheets("PlanosAcao").range(ThisWorkbook.Worksheets("PlanosAcao").Cells(2, 1), ThisWorkbook.Worksheets("PlanosAcao").Cells(ThisWorkbook.Worksheets("PlanosAcao").UsedRange.Rows.Count, ThisWorkbook.Worksheets("PlanosAcao").UsedRange.Columns.Count)).Clear
+    
+    ThisWorkbook.Worksheets("PlanoAcao_LOG").Select
+    If (ThisWorkbook.Worksheets("PlanoAcao_LOG").UsedRange.Rows.Count) > 1 Then ThisWorkbook.Worksheets("PlanoAcao_LOG").range(ThisWorkbook.Worksheets("PlanoAcao_LOG").Cells(2, 1), ThisWorkbook.Worksheets("PlanoAcao_LOG").Cells(ThisWorkbook.Worksheets("PlanoAcao_LOG").UsedRange.Rows.Count, ThisWorkbook.Worksheets("PlanoAcao_LOG").UsedRange.Columns.Count)).Clear
+    
+    ThisWorkbook.Worksheets("RoteiroTestes").Select
+    If (ThisWorkbook.Worksheets("RoteiroTestes").UsedRange.Rows.Count) > 1 Then ThisWorkbook.Worksheets("RoteiroTestes").range(ThisWorkbook.Worksheets("RoteiroTestes").Cells(2, 1), ThisWorkbook.Worksheets("RoteiroTestes").Cells(ThisWorkbook.Worksheets("RoteiroTestes").UsedRange.Rows.Count, ThisWorkbook.Worksheets("RoteiroTestes").UsedRange.Columns.Count)).Clear
+    
+    'sht.Range(sht.Cells(1, 1), sht.Cells(sht.UsedRange.Rows.Count, col_cnt)).Clear
+'-------------------------------------------------------------------------------------------------------------------------
+fileName1 = Dir(path1 & "\arquivo1.xlsm", vbNormal)
+    If Len(fileName1) = 0 Then Exit Function
+    Do Until fileName1 = vbNullString
+        If Not fileName1 = ThisWB Then
+        Application.EnableEvents = False
+            Set Wkb = Workbooks.Open(fileName:=path1 & "\" & fileName1)
+            
+            Wkb.Sheets("ControlesAvaliacoes").Visible = True
+            Wkb.Sheets("ControlesAvaliacoes").Select
+            lLastRow = Wkb.Sheets("ControlesAvaliacoes").Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo0
+            ilastcolumn = Wkb.Sheets("ControlesAvaliacoes").UsedRange.Column + Wkb.Sheets("ControlesAvaliacoes").UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("ControlesAvaliacoes").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("ControlesAvaliacoes")
+            OutLastRow = Workbooks(ThisWB).Sheets("ControlesAvaliacoes").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo0:
+            Wkb.Sheets("Anexos").Visible = True
+            Wkb.Sheets("Anexos").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo1
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("Anexos").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("Anexos")
+            OutLastRow = Workbooks(ThisWB).Sheets("Anexos").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo1:
+            Wkb.Sheets("PlanosAcao").Visible = True
+            Wkb.Sheets("PlanosAcao").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo2
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("PlanosAcao").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("PlanosAcao")
+            OutLastRow = Workbooks(ThisWB).Sheets("PlanosAcao").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo2:
+            Wkb.Sheets("PlanoAcao_LOG").Visible = True
+            Wkb.Sheets("PlanoAcao_LOG").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo3
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Wkb.Sheets("PlanoAcao_LOG").range(Cells(1, 1), Cells(lLastRow, ilastcolumn)).Select
+            Set CopyRng = Wkb.Sheets("PlanoAcao_LOG").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("PlanoAcao_LOG")
+            OutLastRow = Workbooks(ThisWB).Sheets("PlanoAcao_LOG").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo3:
+            Wkb.Sheets("RoteiroTestes").Visible = True
+            Wkb.Sheets("RoteiroTestes").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo4
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("RoteiroTestes").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("RoteiroTestes")
+            OutLastRow = Workbooks(ThisWB).Sheets("RoteiroTestes").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo4:
+            Application.EnableEvents = True
+            Wkb.Close False
+        End If
+        fileName1 = Dir()
+    Loop
+'-------------------------------------------------------------------------------------------------------------------------
+Filename2 = Dir(path2 & "\arquivo2.xlsm", vbNormal)
+    If Len(Filename2) = 0 Then Exit Function
+    Do Until Filename2 = vbNullString
+        If Not Filename2 = ThisWB Then
+        Application.EnableEvents = False
+            Set Wkb = Workbooks.Open(fileName:=path2 & "\" & Filename2)
+            
+            Wkb.Sheets("ControlesAvaliacoes").Visible = True
+            Wkb.Sheets("ControlesAvaliacoes").Select
+            lLastRow = Wkb.Sheets("ControlesAvaliacoes").Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo5
+            ilastcolumn = Wkb.Sheets("ControlesAvaliacoes").UsedRange.Column + Wkb.Sheets("ControlesAvaliacoes").UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("ControlesAvaliacoes").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("ControlesAvaliacoes")
+            OutLastRow = Workbooks(ThisWB).Sheets("ControlesAvaliacoes").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo5:
+            Wkb.Sheets("Anexos").Visible = True
+            Wkb.Sheets("Anexos").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo6
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("Anexos").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("Anexos")
+            OutLastRow = Workbooks(ThisWB).Sheets("Anexos").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo6:
+            Wkb.Sheets("PlanosAcao").Visible = True
+            Wkb.Sheets("PlanosAcao").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo7
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("PlanosAcao").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("PlanosAcao")
+            OutLastRow = Workbooks(ThisWB).Sheets("PlanosAcao").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo7:
+            Wkb.Sheets("PlanoAcao_LOG").Visible = True
+            Wkb.Sheets("PlanoAcao_LOG").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo8
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Wkb.Sheets("PlanoAcao_LOG").range(Cells(1, 1), Cells(lLastRow, ilastcolumn)).Select
+            Set CopyRng = Wkb.Sheets("PlanoAcao_LOG").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("PlanoAcao_LOG")
+            OutLastRow = Workbooks(ThisWB).Sheets("PlanoAcao_LOG").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo8:
+            Wkb.Sheets("RoteiroTestes").Visible = True
+            Wkb.Sheets("RoteiroTestes").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo9
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("RoteiroTestes").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("RoteiroTestes")
+            OutLastRow = Workbooks(ThisWB).Sheets("RoteiroTestes").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo9:
+            Application.EnableEvents = True
+            Wkb.Close False
+        End If
+        Filename2 = Dir()
+    Loop
+'-------------------------------------------------------------------------------------------------------------------------
+Filename3 = Dir(path3 & "\arquivo3&_USD.xlsm", vbNormal)
+    If Len(Filename3) = 0 Then Exit Function
+    Do Until Filename3 = vbNullString
+        If Not Filename3 = ThisWB Then
+        Application.EnableEvents = False
+            Set Wkb = Workbooks.Open(fileName:=path3 & "\" & Filename3)
+            
+            Wkb.Sheets("ControlesAvaliacoes").Visible = True
+            Wkb.Sheets("ControlesAvaliacoes").Select
+            lLastRow = Wkb.Sheets("ControlesAvaliacoes").Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo10
+            ilastcolumn = Wkb.Sheets("ControlesAvaliacoes").UsedRange.Column + Wkb.Sheets("ControlesAvaliacoes").UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("ControlesAvaliacoes").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("ControlesAvaliacoes")
+            OutLastRow = Workbooks(ThisWB).Sheets("ControlesAvaliacoes").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo10:
+            Wkb.Sheets("Anexos").Visible = True
+            Wkb.Sheets("Anexos").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo11
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("Anexos").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("Anexos")
+            OutLastRow = Workbooks(ThisWB).Sheets("Anexos").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo11:
+            Wkb.Sheets("PlanosAcao").Visible = True
+            Wkb.Sheets("PlanosAcao").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo12
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("PlanosAcao").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("PlanosAcao")
+            OutLastRow = Workbooks(ThisWB).Sheets("PlanosAcao").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo12:
+            Wkb.Sheets("PlanoAcao_LOG").Visible = True
+            Wkb.Sheets("PlanoAcao_LOG").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo13
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Wkb.Sheets("PlanoAcao_LOG").range(Cells(1, 1), Cells(lLastRow, ilastcolumn)).Select
+            Set CopyRng = Wkb.Sheets("PlanoAcao_LOG").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("PlanoAcao_LOG")
+            OutLastRow = Workbooks(ThisWB).Sheets("PlanoAcao_LOG").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo13:
+            Wkb.Sheets("RoteiroTestes").Visible = True
+            Wkb.Sheets("RoteiroTestes").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo14
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("RoteiroTestes").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("RoteiroTestes")
+            OutLastRow = Workbooks(ThisWB).Sheets("RoteiroTestes").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo14:
+            Application.EnableEvents = True
+            Wkb.Close False
+        End If
+        Filename3 = Dir()
+    Loop
+'-------------------------------------------------------------------------------------------------------------------------
+Filename4 = Dir(path4 & "\arquivo4.xlsm", vbNormal)
+    If Len(Filename4) = 0 Then Exit Function
+    Do Until Filename4 = vbNullString
+        If Not Filename4 = ThisWB Then
+        Application.EnableEvents = False
+            Set Wkb = Workbooks.Open(fileName:=path4 & "\" & Filename4)
+            
+            Wkb.Sheets("ControlesAvaliacoes").Visible = True
+            Wkb.Sheets("ControlesAvaliacoes").Select
+            lLastRow = Wkb.Sheets("ControlesAvaliacoes").Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo15
+            ilastcolumn = Wkb.Sheets("ControlesAvaliacoes").UsedRange.Column + Wkb.Sheets("ControlesAvaliacoes").UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("ControlesAvaliacoes").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("ControlesAvaliacoes")
+            OutLastRow = Workbooks(ThisWB).Sheets("ControlesAvaliacoes").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo15:
+            Wkb.Sheets("Anexos").Visible = True
+            Wkb.Sheets("Anexos").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo16
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("Anexos").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("Anexos")
+            OutLastRow = Workbooks(ThisWB).Sheets("Anexos").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo16:
+            Wkb.Sheets("PlanosAcao").Visible = True
+            Wkb.Sheets("PlanosAcao").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo17
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("PlanosAcao").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("PlanosAcao")
+            OutLastRow = Workbooks(ThisWB).Sheets("PlanosAcao").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo17:
+            Wkb.Sheets("PlanoAcao_LOG").Visible = True
+            Wkb.Sheets("PlanoAcao_LOG").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo18
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Wkb.Sheets("PlanoAcao_LOG").range(Cells(1, 1), Cells(lLastRow, ilastcolumn)).Select
+            Set CopyRng = Wkb.Sheets("PlanoAcao_LOG").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("PlanoAcao_LOG")
+            OutLastRow = Workbooks(ThisWB).Sheets("PlanoAcao_LOG").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo18:
+            Wkb.Sheets("RoteiroTestes").Visible = True
+            Wkb.Sheets("RoteiroTestes").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo19
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("RoteiroTestes").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("RoteiroTestes")
+            OutLastRow = Workbooks(ThisWB).Sheets("RoteiroTestes").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo19:
+            Application.EnableEvents = True
+            Wkb.Close False
+        End If
+        Filename4 = Dir()
+    Loop
+'-------------------------------------------------------------------------------------------------------------------------
+Filename5 = Dir(path5 & "\arquivo5.xlsm", vbNormal)
+    If Len(Filename5) = 0 Then Exit Function
+    Do Until Filename5 = vbNullString
+        If Not Filename5 = ThisWB Then
+        Application.EnableEvents = False
+            Set Wkb = Workbooks.Open(fileName:=path5 & "\" & Filename5)
+            
+            Wkb.Sheets("ControlesAvaliacoes").Visible = True
+            Wkb.Sheets("ControlesAvaliacoes").Select
+            lLastRow = Wkb.Sheets("ControlesAvaliacoes").Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo20
+            ilastcolumn = Wkb.Sheets("ControlesAvaliacoes").UsedRange.Column + Wkb.Sheets("ControlesAvaliacoes").UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("ControlesAvaliacoes").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("ControlesAvaliacoes")
+            OutLastRow = Workbooks(ThisWB).Sheets("ControlesAvaliacoes").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo20:
+            Wkb.Sheets("Anexos").Visible = True
+            Wkb.Sheets("Anexos").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo21
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("Anexos").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("Anexos")
+            OutLastRow = Workbooks(ThisWB).Sheets("Anexos").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo21:
+            Wkb.Sheets("PlanosAcao").Visible = True
+            Wkb.Sheets("PlanosAcao").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo22
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("PlanosAcao").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("PlanosAcao")
+            OutLastRow = Workbooks(ThisWB).Sheets("PlanosAcao").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo22:
+            Wkb.Sheets("PlanoAcao_LOG").Visible = True
+            Wkb.Sheets("PlanoAcao_LOG").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo23
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Wkb.Sheets("PlanoAcao_LOG").range(Cells(1, 1), Cells(lLastRow, ilastcolumn)).Select
+            Set CopyRng = Wkb.Sheets("PlanoAcao_LOG").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("PlanoAcao_LOG")
+            OutLastRow = Workbooks(ThisWB).Sheets("PlanoAcao_LOG").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo23:
+            Wkb.Sheets("RoteiroTestes").Visible = True
+            Wkb.Sheets("RoteiroTestes").Select
+            lLastRow = ActiveSheet.Cells(Rows.Count, 1).End(xlUp).Row
+        If lLastRow = 1 Then GoTo Proximo24
+            ilastcolumn = ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1
+            Set CopyRng = Wkb.Sheets("RoteiroTestes").range(Cells(RowofCopySheet, 1), Cells(lLastRow, ilastcolumn))
+            Set shtDest = Workbooks(ThisWB).Sheets("RoteiroTestes")
+            OutLastRow = Workbooks(ThisWB).Sheets("RoteiroTestes").Cells(Rows.Count, 1).End(xlUp).Row + 1
+            Set Dest = shtDest.range("A" & OutLastRow)
+            CopyRng.Copy Dest
+Proximo24:
+            Application.EnableEvents = True
+            Wkb.Close False
+        End If
+        Filename5 = Dir()
+    Loop
+
+    Call Proteger_ControlesAvaliacoes
+    Call Proteger_Anexos
+    Call Proteger_PlanosAcao
+    Call Proteger_PlanoAcao_LOG
+    Call Proteger_RoteiroTestes
+    
+    Application.EnableEvents = True
+    Application.ScreenUpdating = True
+    MsgBox "Complete"
+End Function
+
+'Exemplo de um dos Proteger e Desproteger:
+
+'--------------------------------------------------------------------------------------------------------------------
+'                                           ControlesAvaliacoes
+Sub Proteger_Planilha()
+On Error GoTo Err_Control
+ThisWorkbook.Activate
+    Dim ws As Worksheet: Set ws = ThisWorkbook.Worksheets("PLANILHA")
+    Dim strPassword As String: strPassword = "SENHA"
+    If ws.Visible = True Then ws.Visible = False
+    
+ws.Protect Password:=strPassword, DrawingObjects:=True, Contents:=True, Scenarios:=True, _
+        UserInterfaceOnly:=True, AllowFormattingCells:=False, AllowFormattingColumns:=False, _
+        AllowFormattingRows:=False, AllowInsertingColumns:=False, AllowInsertingRows:=False, _
+        AllowInsertingHyperlinks:=False, AllowDeletingColumns:=False, AllowDeletingRows:=False, _
+        AllowSorting:=False, AllowFiltering:=False, AllowUsingPivotTables:=False
+Err_Control:
+If Err.Number <> 0 Then
+    MsgBox Err.Description
+    Call LogErr("Proteger_Planilha", Err.Number, Err.Description)
+End If
+End Sub
+
+Sub DesProteger_Planilha()
+On Error GoTo Err_Control
+ThisWorkbook.Activate
+    Dim ws As Worksheet: Set ws = ThisWorkbook.Worksheets("PLANILHA")
+    Dim strPassword As String: strPassword = "SENHA"
+    If ws.Visible = False Then ws.Visible = True
+    ws.Unprotect Password:=strPassword
+Err_Control:
+If Err.Number <> 0 Then
+    MsgBox Err.Description
+    Call LogErr("DesProteger_Planilha", Err.Number, Err.Description)
+End If
+End Sub
+'--------------------------------------------------------------------------------------------------------------------
+'Log de erro
+Public Function LogErr(Modulo As String, ErrNumber As Long, ErrDescription As String)
+On Error Resume Next
+Dim strFile_Path As String
+strFile_Path = Application.ActiveWorkbook.Path & "\" & ActiveWorkbook.Name & "_" & "log_file.txt"
+    Open strFile_Path For Append As #1
+    Write #1, Now() & " | Módulo: " & Modulo & " | Err_Number: " & ErrNumber & " | Err_Description: " & ErrDescription & " | Máquina: " & Environ$("computername") & " | User: " & Application.UserName
+    Close #1
+End Function
+
+

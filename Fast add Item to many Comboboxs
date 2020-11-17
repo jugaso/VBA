@@ -1,0 +1,39 @@
+'Coded by Julio Gadioli Soares
+'Easy way to add item to many Combobox, with inside data from worksheet.
+'use, sample: Call CarregarComboBoxes(CboIndice, "SUPORTE", "K") 
+
+Public Function CarregarComboBoxes(CboCombobox As ComboBox, dbPlan As String, dbColuna As String)
+On Error GoTo Err_Control
+Dim i As Long
+Dim j As Long
+Dim Area As Range
+Dim IArea As Range
+Dim QntArea As Long
+
+QntArea = (ThisWorkbook.Worksheets(dbPlan).Cells(Rows.count, dbColuna).End(xlUp).Row)
+Set Area = ThisWorkbook.Worksheets(dbPlan).Range(dbColuna & "2:" & dbColuna & QntArea)
+
+CboCombobox.Clear
+For Each IArea In Area
+    CboCombobox.AddItem IArea.Value
+Next IArea
+
+For i = 0 To CboCombobox.ListCount - 1  'Exclui duplicatas
+    For j = CboCombobox.ListCount - 1 To i + 1 Step -1
+        If CboCombobox.List(i) = CboCombobox.List(j) Then
+            CboCombobox.RemoveItem (j)
+        End If
+    Next j
+Next i
+
+Err_Control:
+If Err.Number <> 0 Then
+    MsgBox Err.Description
+    Call LogErr("CarregarComboBoxes", Err.Number, Err.Description)
+End If
+i = vbNull
+j = vbNull
+Set Area = Nothing
+Set IArea = Nothing
+QntArea = vbNull
+End Function
